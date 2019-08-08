@@ -1,1 +1,3 @@
 # dag-gen
+
+Generating DAGs.
