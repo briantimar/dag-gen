@@ -2,6 +2,26 @@ import unittest
 import torch
 import numpy as np
 
+
+class TestTorchDAG(unittest.TestCase):
+
+    def setUp(self):
+        from .models import TorchDAG
+
+        self.activation_choices = [torch.relu]
+        batch_size = 3
+        max_v = 4
+        connections = torch.zeros(batch_size, max_v, max_v,dtype=torch.uint8)
+        active_vertices = torch.ones(batch_size, max_v, dtype=torch.uint8)
+        for i in range(max_v):
+            connections[:, i, :i] = 1
+        activations = torch.zeros(batch_size, max_v,dtype=torch.long)
+        
+        self.dag = TorchDAG(self.activation_choices, connections, activations, active_vertices)
+
+    def test_init(self):
+        self.assertEqual(len(self.activation_choices), self.dag.num_activations)
+
 class TestMLP(unittest.TestCase):
 
     def setUp(self):
@@ -67,7 +87,6 @@ class TestGraphGRU(unittest.TestCase):
         batch_size=5
         max_vertices=None
         next_active_vertices, connections, activations, log_probs = self.test_graph_gru.sample_graph_tensors(batch_size, max_vertices=max_vertices)
-        
         #check that all outputs have the right shape
         max_vertices = next_active_vertices.size(1)
         for t in (next_active_vertices, activations):

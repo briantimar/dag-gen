@@ -3,6 +3,33 @@
 import torch
 from torch.distributions.categorical import Categorical
 
+class TorchDAG:
+    """ Define and apply batched computational graphs based on torch mask tensors and a list of activation functions."""
+
+    def __init__(self, activation_choices, connections, activations, active_vertices):
+        """ activation_choices: a list of torch activation functions
+            connections: (N, max_vertices, max_vertices) tensor defining connections between neurons
+            activations: (N, max_vertices) tensor specifying which activations are to be applied at the output of each vertex.
+            active_vertices: (N, max_vertices) unit8 tensor specifying how many vertices of each graph are used.
+        """
+        self.activation_choices = activation_choices
+        self.num_activations = len(activation_choices)
+        self.connections = connections
+        self.activations = activations
+        self.active_vertices = active_vertices
+
+        self.max_vertices = self.activations.size(1)
+        self.batch_size = self.activations.size(0)
+
+        if tuple(connections.shape) != (self.batch_size, self.max_vertices, self.max_vertices):
+            raise ValueError("Invalid connections shape {0}".format(connections.shape))
+        if tuple(activations.shape) != (self.batch_size, self.max_vertices):
+            raise ValueError("Invalid activations shape {0}".format(activations.shape))
+        if tuple(active_vertices.shape) != (self.batch_size, self.max_vertices):
+            raise ValueError("Invalid active_vertices shape {0}".format(active_vertices.shape))
+
+            
+
 class MLP(torch.nn.Module):
     """Dense network."""
 
@@ -182,7 +209,7 @@ class GraphGRU(GraphRNN):
 
         #bool tensor which defines the connectivity of each graph
         #the i, j, k entry indicates whether a connection k ->j exists in the ith graph
-        connections_all = torch.zeros(N, max_num_vertices, max_num_vertices, dtype=torch.long)
+        connections_all = torch.zeros(N, max_num_vertices, max_num_vertices, dtype=torch.uint8)
         
         #log-probabilities for each graph
         log_probs = torch.stack(log_probs, dim=1)
