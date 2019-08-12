@@ -154,15 +154,21 @@ class GraphGRU(GraphRNN):
         lps = dist.log_prob(samples)
         return samples, lps
 
-    def sample_graph_tensors(self, N, max_vertices=100 ):
+    def sample_graph_tensors(self, N, max_vertices=None, min_vertices=None ):
         """ Sample N graph encodings from the GraphGRU.
         
         `N`: how many graphs to sample
         `max_vertices`: if not None, the max number of vertices to permit in each graph.
+        `min_vertices`: if not None, the sampled graphs will contain at least this many vertices.
         
         Returns: next_active_vertices (N, maxnum) bool tensor specifying which vertices exist in each graph.
                 connections_all (N, maxnum, maxnum) bool tensor. The i, j, k element is nonzero iff a connection k -> j exists in the ith graph.
                 activations (N, maxnum) int tensor specifying an activation function to be applied at each vertex."""
+
+        if max_vertices is not None and min_vertices is not None and (max_vertices < min_vertices):
+            raise ValueError("Invalid vertex number specs: min, max = {0}, {1}".format(min_vertices, max_vertices))
+        if max_vertices is not None and max_vertices < 1:
+            raise ValueError("Invalid max vertex number {0}".format(max_vertices))
 
         vertex_index = 0
         graph_complete = False
@@ -224,7 +230,9 @@ class GraphGRU(GraphRNN):
             
             vertex_index += 1
             ##sampling halts when all graph sequences have terminated, or max number of vertices is reached
-            graph_complete = next_active_graphs.sum().item()==0 or (max_vertices is not None and vertex_index == max_vertices)
+            min_vertices_satisfied = (min_vertices is None or vertex_index >= min_vertices)
+            max_verticies_satisfied = (max_vertices is not None and vertex_index == max_vertices)
+            graph_complete = min_vertices_satisfied and ( next_active_graphs.sum().item()==0 or max_verticies_satisfied)
 
         #when all graphs have finished sampling, stack together the sequences that define the graphs, and the corresponding log-probs
 

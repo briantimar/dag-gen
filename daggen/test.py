@@ -133,5 +133,14 @@ class TestGraphGRU(unittest.TestCase):
         #log probs are nonpositive
         self.assertEqual( (log_probs <=0).sum().item(), batch_size )
 
+    def test_min_vertices(self):
+        batch_size=5
+        min_vertices=4
+        max_vertices=4
+        next_active_vertices, connections, activations, __ = self.test_graph_gru.sample_graph_tensors(batch_size, min_vertices=min_vertices,
+                                                                                                                    max_vertices=max_vertices)
+        for tensor in (next_active_vertices, connections, activations):
+            self.assertTrue(tensor.size(1) == min_vertices)
+
 if __name__ == "__main__":
     unittest.main()
