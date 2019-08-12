@@ -121,7 +121,7 @@ class GraphRNN(torch.nn.Module):
 
 
 class ScalarGraphGRU(GraphRNN):
-    """ Graph generator which uses GRU cells."""
+    """ Graph generator which uses GRU cells. Each graph sampled from the distribution accepts a single scalar input."""
 
     def __init__(self, hidden_size, logits_hidden_size, num_activations):
         """ hidden_size: dimensionality of the hidden state for vertex and edge cells.
@@ -154,8 +154,8 @@ class ScalarGraphGRU(GraphRNN):
         lps = dist.log_prob(samples)
         return samples, lps
 
-    def sample_graph_tensors(self, N, max_vertices=None, min_vertices=None ):
-        """ Sample N graph encodings from the ScalarGraphGRU.
+    def _sample_graph_tensors_resolved_logprobs(self, N, max_vertices=None, min_vertices=None ):
+        """ Sample N graph encodings from the ScalarGraphGRU, with log probs resolved by vertex.
         
         `N`: how many graphs to sample
         `max_vertices`: if not None, the max number of vertices to permit in each graph.
@@ -163,7 +163,8 @@ class ScalarGraphGRU(GraphRNN):
         
         Returns: next_active_vertices (N, maxnum) bool tensor specifying which vertices exist in each graph.
                 connections_all (N, maxnum, maxnum) bool tensor. The i, j, k element is nonzero iff a connection k -> j exists in the ith graph.
-                activations (N, maxnum) int tensor specifying an activation function to be applied at each vertex."""
+                activations (N, maxnum) int tensor specifying an activation function to be applied at each vertex.
+                log_probss: (N, maxnum) tensor of log-probabilities, one for each vertex, conditional on its ancestors."""
 
         if max_vertices is not None and min_vertices is not None and (max_vertices < min_vertices):
             raise ValueError("Invalid vertex number specs: min, max = {0}, {1}".format(min_vertices, max_vertices))
@@ -265,4 +266,34 @@ class ScalarGraphGRU(GraphRNN):
             conns = torch.stack(all_connections[i], dim=1)
             connections_all[:, i, :i] = conns
         
-        return next_active_vertices, connections_all, activations, log_probs.sum(dim=1)
+        return next_active_vertices, connections_all, activations, log_probs
+
+    def sample_graph_tensors(self, N, max_vertices=None, min_vertices=None ):
+        """ Sample N graph encodings from the ScalarGraphGRU.
+        
+        `N`: how many graphs to sample
+        `max_vertices`: if not None, the max number of vertices to permit in each graph.
+        `min_vertices`: if not None, the sampled graphs will contain at least this many vertices.
+        
+        Returns: next_active_vertices (N, maxnum) bool tensor specifying which vertices exist in each graph.
+                connections_all (N, maxnum, maxnum) bool tensor. The i, j, k element is nonzero iff a connection k -> j exists in the ith graph.
+                activations (N, maxnum) int tensor specifying an activation function to be applied at each vertex.
+                log_probs: (N,) tensor of log-probabilities, one for each sampled graph"""
+        next_active_vertices, connections, activations, lps_resolved = self._sample_graph_tensors_resolved_logprobs(N, max_vertices=max_vertices, min_vertices=min_vertices)
+        return next_active_vertices, connections, activations, lps_resolved.sum(dim=1)
+
+class GraphGRU(ScalarGraphGRU):
+    """ Defines a distribution over graphs which may have arbitrary input / output dimensions."""
+
+    def __init__(self, input_dim, output_dim,
+                    hidden_size, logits_hidden_size, num_activations ):
+        super().__init__(hidden_size, logits_hidden_size, num_activations)
+        if input_dim < 1:
+            raise ValueError("Invalid input dimension {0}").format(input_dim)
+        if output_dim < 1:
+            raise ValueError("Invalid output dimension {0}".format(output_dim))
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.min_vertices = input_dim + output_dim
+
+    

@@ -106,6 +106,14 @@ class TestScalarGraphGRU(unittest.TestCase):
         self.assertEqual(tuple(s.shape), (10,))
         self.assertTrue(max(s) < 4)
         
+    def test__sample_graph_tensors_resolved_logprobs(self):
+        batch_size=5
+        max_vertices=4
+        next_active_vertices, connections, activations, log_probs = self.test_graph_gru._sample_graph_tensors_resolved_logprobs(batch_size, max_vertices=max_vertices)
+
+        max_vertices = next_active_vertices.size(1)
+        self.assertEqual(tuple(log_probs.shape), (batch_size,max_vertices))
+
     def test_sample_graph_tensors(self):
         batch_size=5
         max_vertices=None
