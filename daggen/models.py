@@ -28,7 +28,42 @@ class TorchDAG:
         if tuple(active_vertices.shape) != (self.batch_size, self.max_vertices):
             raise ValueError("Invalid active_vertices shape {0}".format(active_vertices.shape))
 
+        nact = self.active_vertices[:, 0].sum().item()
+        if nact != self.batch_size:
+            raise ValueError("All initial vertices should be active")
+
+    def forward(self, x):
+        """ Compute forward passes for each of the networks.
+            `x`: (N,) tensor 
+            Returns: (N,), obtained by applying the ith network to the ith element of x.
+            """
+        if tuple(x.shape) != (self.batch_size,):
+            raise ValueError("Invalid input shape {0} for DAG batch size {1}".format(x.shape, self.batch_size))
+
+        # tensor to hold intermediate computation results
+        # y[:, i] is the graph value at layer i of the topological sort, or zero where the graph computation has already finished
+        y = torch.zeros(self.batch_size, self.max_vertices, dtype=torch.float)
+        inputs = torch.zeros_like(y)
+        
+        for i in range(self.max_vertices):
+            if i == 0:
+                summed_input = x
+            else:
+                input_vertices = self.connections[:, i, :]
+                inputs.copy_(y)
+                inputs[~input_vertices] = 0
+                summed_input = inputs.sum(dim=1)
             
+            all_act = torch.stack([f(summed_input) for f in self.activation_choices], dim=1)
+            output = all_act[range(self.batch_size), self.activations[:, i]]
+            y[self.active_vertices[:, i], i] = output[self.active_vertices[:, i]]
+            if i > 0:
+                y[~self.active_vertices[:, i], i] = y[~self.active_vertices[:, i], i-1]
+        return y[:, -1]
+            
+
+
+        
 
 class MLP(torch.nn.Module):
     """Dense network."""
