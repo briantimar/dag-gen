@@ -120,7 +120,7 @@ class GraphRNN(torch.nn.Module):
 
 
 
-class GraphGRU(GraphRNN):
+class ScalarGraphGRU(GraphRNN):
     """ Graph generator which uses GRU cells."""
 
     def __init__(self, hidden_size, logits_hidden_size, num_activations):
@@ -155,7 +155,7 @@ class GraphGRU(GraphRNN):
         return samples, lps
 
     def sample_graph_tensors(self, N, max_vertices=None, min_vertices=None ):
-        """ Sample N graph encodings from the GraphGRU.
+        """ Sample N graph encodings from the ScalarGraphGRU.
         
         `N`: how many graphs to sample
         `max_vertices`: if not None, the max number of vertices to permit in each graph.

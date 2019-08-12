@@ -72,21 +72,21 @@ class TestTwoLayerMLP(unittest.TestCase):
         mlp = TwoLayerMLP(5, 4, 2)
         self.assertEqual(mlp.num_layers, 2)
 
-class TestGraphGRU(unittest.TestCase):
+class TestScalarGraphGRU(unittest.TestCase):
 
     def setUp(self):
-        from .models import GraphGRU
+        from .models import ScalarGraphGRU
         hidden_size=16
         logits_hidden_size=4
         num_activations = 5
-        self.test_graph_gru = GraphGRU(hidden_size, logits_hidden_size, num_activations)
+        self.test_graph_gru = ScalarGraphGRU(hidden_size, logits_hidden_size, num_activations)
         
     def test_build(self):
-        from .models import GraphGRU
+        from .models import ScalarGraphGRU
         hidden_size=16
         logits_hidden_size=4
         num_activations = 5
-        gg = GraphGRU(hidden_size, logits_hidden_size, num_activations)
+        gg = ScalarGraphGRU(hidden_size, logits_hidden_size, num_activations)
 
     def test_modules(self):
         for module in ['vertex_cell', 'edge_cell', 'activation_cell', 'vertex_logits', 'edge_logits', 'activation_logits']:
