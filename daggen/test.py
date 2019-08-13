@@ -164,6 +164,8 @@ class TestGraphGRU(unittest.TestCase):
     def test__sample_graph_tensors_resolved(self):
         batch_size = 2
         lengths, all_connections, activations, log_probs = self.graphgru._sample_graph_tensors_resolved(batch_size)
+        maxnum = lengths.max().item()
+        self.assertEqual(len(activations), maxnum + self.num_output)
         self.assertEqual(tuple(lengths.shape), (batch_size,))
         self.assertEqual(len(log_probs), len(activations))
         self.assertEqual(len(all_connections), len(activations))
