@@ -170,5 +170,31 @@ class TestGraphGRU(unittest.TestCase):
         self.assertEqual(len(log_probs), len(activations))
         self.assertEqual(len(all_connections), len(activations))
 
+    def test_sample_graph_tensors(self):
+        batch_size=5
+        num_intermediate, activations, connections = self.graphgru.sample_graph_tensors(batch_size)
+        maxnum = num_intermediate.max().item()
+        max_num_emitting = maxnum + self.num_input
+        max_num_act = maxnum + self.num_output
+
+        #check that the shapes come out right
+        self.assertEqual(tuple(num_intermediate.shape), (batch_size,))
+        self.assertEqual(tuple(activations.shape), (batch_size, max_num_act))
+        self.assertEqual(tuple(connections.shape), (batch_size, max_num_act, max_num_emitting))
+
+        #check that all the graph tensors are "left-justified"
+        for i in range(batch_size):
+            ni=num_intermediate[i]
+            num_act = ni + self.num_output
+            num_act_unused = max_num_act - num_act
+            num_emitting = ni + self.num_input
+            num_emitting_unused = max_num_emitting - num_emitting
+
+            self.assertEqual( (activations[i]==-1).sum().item(), num_act_unused)
+            self.assertEqual( connections[i, num_act:, ...].sum().item(), 0)
+            for j in range(num_act):
+                self.assertEqual( connections[i, j, num_emitting:].sum().item(), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

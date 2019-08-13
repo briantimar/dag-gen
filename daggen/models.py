@@ -384,7 +384,7 @@ class GraphGRU(ScalarGraphGRU):
 
                     edge_input = add_connection.view(N, 1).to(dtype=torch.float)
                 
-                all_connections.append(vertex_connections)
+                all_connections.append(torch.stack(vertex_connections, dim=1))
                 # finally, determine which activation function to apply to this vertex
                 act_state = self.activation_cell(edge_input, edge_hidden_state)
                 act_logits = self.activation_logits(act_state)
@@ -431,7 +431,7 @@ class GraphGRU(ScalarGraphGRU):
 
                 edge_input = add_connection.view(N, 1).to(dtype=torch.float)
            
-            all_connections.append(vertex_connections)
+            all_connections.append(torch.stack(vertex_connections, dim=1))
             
             act_state = self.activation_cell(edge_input, edge_hidden_state)
             act_logits = self.activation_logits(act_state)
@@ -471,4 +471,31 @@ class GraphGRU(ScalarGraphGRU):
             the last output_dim are the output vertices
             All vertices in between, if any, are the intermediate vertices.
             """
-        pass
+        from torch.nn.utils.rnn import pad_sequence
+        
+        num_intermediate, connections_by_vertex, activations_by_vertex, log_probs_by_vertex = self._sample_graph_tensors_resolved(N, max_intermediate_vertices=max_intermediate_vertices, 
+                                                                                                        min_intermediate_vertices=min_intermediate_vertices)
+        max_num_intermediate = num_intermediate.max().item()
+        #the number of 'active' neurons, which have activations and have nontrivial connections (everything but the inputs)
+        max_num_active = max_num_intermediate + self.output_dim
+        assert len(connections_by_vertex) == max_num_active
+        assert len(activations_by_vertex) == max_num_active
+        assert len(log_probs_by_vertex) == max_num_active
+       
+        #first, stack the activations together
+        activations = torch.stack(activations_by_vertex, dim=1)
+        for i in range(N):
+            ni = num_intermediate[i]
+            activations[i, ni:ni+self.output_dim] = activations[i, -self.output_dim:]
+            activations[i, ni+self.output_dim:] = -1
+
+            
+        connections = pad_sequence([c.permute(1, 0) for c in connections_by_vertex], batch_first=True)
+        connections = connections.permute(2, 0, 1)
+        #finally, move the nonzero entries around so that they all come first for a given batch index
+        for i in range(N):
+            ni = num_intermediate[i]
+            connections[i, ni:ni+self.output_dim, ...] = connections[i,-self.output_dim:, ... ]
+            connections[i, ni+self.output_dim:, ...] = 0 
+        
+        return num_intermediate, activations, connections
