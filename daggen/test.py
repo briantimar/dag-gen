@@ -37,7 +37,6 @@ class TestTorchDAG(unittest.TestCase):
         x0 = torch.tensor(1.0)
         x = x0.expand(self.batch_size)
         y = self.dag.forward(x)
-        print(y)
         self.assertEqual(tuple(y.shape), (self.batch_size,))
         
         target_0 = .5 * x0
@@ -149,6 +148,25 @@ class TestScalarGraphGRU(unittest.TestCase):
                                                                                                                     max_vertices=max_vertices)
         for tensor in (next_active_vertices, connections, activations):
             self.assertTrue(tensor.size(1) == min_vertices)
+
+class TestGraphGRU(unittest.TestCase):
+
+    def setUp(self):
+        from .models import GraphGRU
+        
+        self.num_input = 2
+        self.num_output = 3
+        hidden_size = 10
+        logits_hidden_size = 10
+        self.num_activations = 4
+        self.graphgru = GraphGRU(self.num_input, self.num_output, hidden_size, logits_hidden_size, self.num_activations)
+
+    def test__sample_graph_tensors_resolved(self):
+        batch_size = 2
+        lengths, all_connections, activations, log_probs = self.graphgru._sample_graph_tensors_resolved(batch_size)
+        self.assertEqual(tuple(lengths.shape), (batch_size,))
+        self.assertEqual(len(log_probs), len(activations))
+        self.assertEqual(len(all_connections), len(activations))
 
 if __name__ == "__main__":
     unittest.main()

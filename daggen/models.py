@@ -294,6 +294,181 @@ class GraphGRU(ScalarGraphGRU):
             raise ValueError("Invalid output dimension {0}".format(output_dim))
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.min_vertices = input_dim + output_dim
+        self.num_io_vertices = input_dim + output_dim
 
-    
+    def _sample_graph_tensors_resolved(self, N, max_intermediate_vertices=None, min_intermediate_vertices=None): 
+        """ Sample N graph encodings from the GraphGRU with log probs.
+        
+        `N`: how many graphs to sample
+        `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
+        `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
+        
+        Let maxnum denote the max number of intermediate vertices among all sampled graphs. Then return values are
+                `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each sampled graph.
+                `connections` maxnum+output_dim length list of byte tensor lists. Each inner list has length maxnum + input_dim.
+                    connections[i][j] is a byte tensor indicating, for each graph in the batch, whether a connection j -> i exists.
+                `activations` maxnum+output_dim length list of integer tensors. Each specifies the activation applied at a particular vertex in each graph; entries are -1 if the vertex 
+                does not exist in that graph. The last output_dim entries always exist and correspond to the activations applied to the output neurons.
+                `log_probs`: maxnum + output_dim length list of log-probabilities.
+        
+        Vertices are ordered in the following manner:
+            the first input_dim are the input vertices
+            the last output_dim are the output vertices
+            All vertices in between, if any, are the intermediate vertices.
+            """
+
+        if max_intermediate_vertices is not None and min_intermediate_vertices is not None and (max_intermediate_vertices < min_intermediate_vertices):
+            raise ValueError("Invalid vertex number specs: min, max = {0}, {1}".format(min_intermediate_vertices, max_intermediate_vertices))
+        if max_intermediate_vertices is not None and max_intermediate_vertices < 1:
+            raise ValueError("Invalid max vertex number {0}".format(max_intermediate_vertices))
+
+        #index of the current vertex
+        # start sampling after the input vertices
+        vertex_index = self.input_dim
+
+        graph_complete = False
+        vertex_hidden_state = self.hidden_init.view(1, -1).expand(N, self.hidden_size)
+        vertex_input = self.vertex_input_init.view(1, -1).expand(N, self.vertex_input_size)
+
+        # indicates the number of intermediate vertices in each sampled graph
+        num_intermediate = torch.zeros(N, dtype=torch.long)
+
+        #holds log probabilities for the batch
+        log_probs = []
+        # holds connectivity matrices
+        all_connections = []
+        #holds sampled activation functions
+        activations = []
+
+        #keep track of which graphs have more neurons to sample.
+        active_graphs = torch.ones(N,dtype=torch.uint8)
+        
+        while not graph_complete:
+            #compute new hidden state
+            vertex_hidden_state = self.vertex_cell(vertex_input, vertex_hidden_state)
+            #check whether another vertex should be added
+            vertex_logits = self.vertex_logits(vertex_hidden_state)
+            add_vertex, lp_vertex = self._get_samples_and_log_probs(vertex_logits)
+            #a graph is active only if it has added a vertex at each sampling step.
+
+            active_graphs = active_graphs & (add_vertex > 0)
+            
+            num_intermediate += active_graphs.to(dtype=torch.long)
+
+            ##sampling halts when all graph sequences have terminated, or max number of vertices is reached
+            min_vertices_satisfied = (min_intermediate_vertices is None or (vertex_index - self.input_dim) >= min_intermediate_vertices)
+            max_vertices_satisfied = (max_intermediate_vertices is not None and (vertex_index - self.input_dim) == max_intermediate_vertices)
+            graph_complete = min_vertices_satisfied and ( active_graphs.sum().item()==0 or max_vertices_satisfied)
+
+            if not graph_complete:
+
+                #now pass hidden state down to edge cells
+                edge_hidden_state = vertex_hidden_state
+                edge_input_init = torch.zeros(N,1)
+                edge_input = edge_input_init
+
+                #determine whether to connect to each previous vertex
+                vertex_connections = []
+                for prev_index in range(vertex_index):
+                    #compute edge hidden state
+                    edge_hidden_state = self.edge_cell(edge_input, edge_hidden_state)            
+                    #sample connectivity to prev_index
+                    connection_logits = self.edge_logits(edge_hidden_state)
+                    add_connection, lp_connection = self._get_samples_and_log_probs(connection_logits)
+                    #ignore graphs which have already finished sampling
+                    add_connection[~active_graphs] = 0
+                    lp_connection[~active_graphs] = 0
+
+                    lp_vertex += lp_connection
+                    vertex_connections.append(add_connection)
+
+                    edge_input = add_connection.view(N, 1).to(dtype=torch.float)
+                
+                all_connections.append(vertex_connections)
+                # finally, determine which activation function to apply to this vertex
+                act_state = self.activation_cell(edge_input, edge_hidden_state)
+                act_logits = self.activation_logits(act_state)
+                activation, lp_act = self._get_samples_and_log_probs(act_logits)
+                activation[~active_graphs] = -1
+                lp_act[~active_graphs] = 0
+                lp_vertex += lp_act
+
+                activations.append(activation)
+                #record the conditional log-probability for everything sampled at this vertex
+                log_probs.append(lp_vertex)
+
+                #compute input to the next vertex cell
+                vertex_input = torch.cat((edge_hidden_state, activation.view(-1, 1).to(dtype=torch.float)), dim=1)
+                
+                vertex_index += 1
+
+        #at this point, there are no more intermediate vertices to sample
+        #however, the connections to the output vertices still have to be defined
+        maxnum = vertex_index - self.input_dim
+        max_graph_size = maxnum + self.input_dim + self.output_dim
+        # the outputs are treated as vertices which exist with probability 1, but can't connect to each other.
+        # NOTE activations are applied to the output vertices!
+        if num_intermediate.sum().item()==0:
+            edge_hidden_state = vertex_hidden_state
+        for vertex_index in range(vertex_index, max_graph_size):
+            edge_input_init = torch.zeros(N,1)
+            edge_input = edge_input_init
+            lp_vertex = torch.zeros(N)
+
+            vertex_connections = []
+
+            for prev_index in range(maxnum + self.input_dim):
+                #compute edge hidden state
+                edge_hidden_state = self.edge_cell(edge_input, edge_hidden_state)            
+                #sample connectivity to prev_index
+                connection_logits = self.edge_logits(edge_hidden_state)
+                add_connection, lp_connection = self._get_samples_and_log_probs(connection_logits)
+                # for each graph, only look at prev connections which are actually possible for that graph.
+                vertex_exists = (num_intermediate + self.input_dim) > prev_index
+                add_connection[~vertex_exists] = 0
+                lp_vertex[vertex_exists] += lp_connection[vertex_exists]
+                vertex_connections.append(add_connection)
+
+                edge_input = add_connection.view(N, 1).to(dtype=torch.float)
+           
+            all_connections.append(vertex_connections)
+            
+            act_state = self.activation_cell(edge_input, edge_hidden_state)
+            act_logits = self.activation_logits(act_state)
+            activation, lp_act = self._get_samples_and_log_probs(act_logits)
+            lp_vertex += lp_act
+
+            activations.append(activation)
+            log_probs.append(lp_vertex)
+        
+        #return the lists of tensors which together define graphs
+
+        return num_intermediate, all_connections, activations, log_probs
+
+
+    def sample_graph_tensors(self, N, max_intermediate_vertices=None, min_intermediate_vertices=None): 
+        """ Sample N graph encodings from the GraphGRU with log probs.
+        
+        `N`: how many graphs to sample
+        `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
+        `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
+        
+        Let maxnum denote the max number of intermediate vertices among all sampled graphs. Then return values are
+                `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each sampled graph.
+                `connections` (N, maxnum + output_dim, maxnum + input_dim) byte tensor. The i, j, k element is nonzero iff a connection k -> j exists in the ith graph.
+                `activations` (N, maxnum + output_dim) int tensor specifying an activation function to be applied at each intermediate vertex.
+                    Takes values in 0, ... num_activations -1
+                `log_probs`: (N,) float tensor of log-probabilities assigned to each graph in the batch
+        
+        Generally each sampled graph will have less than maxnum intermediate vertices. In these cases, only certain portions of each slice of the returned tensors
+        are actually used to specify a graph. Suppose the ith graph has n intermediate vertices. Then:
+            Its activations are specified in activations[i, -(n+output_dim):]
+            Its connections are specified in connections[i, :(n + output_dim), :(n + input_dim)]
+        The other entries of these tensors (for a particular batch index) should be ignored.
+
+        Vertices are ordered in the following manner:
+            the first input_dim are the input vertices
+            the last output_dim are the output vertices
+            All vertices in between, if any, are the intermediate vertices.
+            """
+        pass
