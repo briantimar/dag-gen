@@ -349,19 +349,31 @@ class GraphGRU(ScalarGraphGRU):
             #check whether another vertex should be added
             vertex_logits = self.vertex_logits(vertex_hidden_state)
             add_vertex, lp_vertex = self._get_samples_and_log_probs(vertex_logits)
+
+            
             #a graph is active only if it has added a vertex at each sampling step.
+            if min_intermediate_vertices is not None and (vertex_index+1 - self.input_dim) <= min_intermediate_vertices:
+                add_vertex = torch.ones(N, dtype=torch.long)
+                lp_vertex = torch.zeros(N)
+                min_vertices_satisfied = False
+            else:
+                min_vertices_satisfied = True
+
+            if max_intermediate_vertices is not None and (vertex_index+1 - self.input_dim) > max_intermediate_vertices:
+                add_vertex = torch.zeros(N, dtype=torch.long)
+                lp_vertex = torch.zeros(N)
+                max_vertices_satisfied = True
+            else:
+                max_vertices_satisfied = False
 
             active_graphs = active_graphs & (add_vertex > 0)
             
             num_intermediate += active_graphs.to(dtype=torch.long)
 
             ##sampling halts when all graph sequences have terminated, or max number of vertices is reached
-            min_vertices_satisfied = (min_intermediate_vertices is None or (vertex_index - self.input_dim) >= min_intermediate_vertices)
-            max_vertices_satisfied = (max_intermediate_vertices is not None and (vertex_index - self.input_dim) == max_intermediate_vertices)
             graph_complete = min_vertices_satisfied and ( active_graphs.sum().item()==0 or max_vertices_satisfied)
 
             if not graph_complete:
-
                 #now pass hidden state down to edge cells
                 edge_hidden_state = vertex_hidden_state
                 edge_input_init = torch.zeros(N,1)

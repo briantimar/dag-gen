@@ -195,6 +195,14 @@ class TestGraphGRU(unittest.TestCase):
             for j in range(num_act):
                 self.assertEqual( connections[i, j, num_emitting:].sum().item(), 0)
 
+    def test_sampling_size_constraints(self):
+        batch_size = 5
+        num_int = 3
+        num_intermediate, activations, connections = self.graphgru.sample_graph_tensors(batch_size, max_intermediate_vertices=num_int, 
+                                                                                                    min_intermediate_vertices=num_int)
+        print(num_intermediate)
+        self.assertEqual(tuple(activations.shape), (batch_size, num_int + self.num_output))
+        self.assertEqual((num_intermediate - num_int).abs().sum(), 0)
 
 if __name__ == "__main__":
     unittest.main()
