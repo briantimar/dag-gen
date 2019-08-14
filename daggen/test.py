@@ -172,13 +172,14 @@ class TestGraphGRU(unittest.TestCase):
 
     def test_sample_graph_tensors(self):
         batch_size=5
-        num_intermediate, activations, connections = self.graphgru.sample_graph_tensors(batch_size)
+        num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(batch_size)
         maxnum = num_intermediate.max().item()
         max_num_emitting = maxnum + self.num_input
         max_num_act = maxnum + self.num_output
 
         #check that the shapes come out right
         self.assertEqual(tuple(num_intermediate.shape), (batch_size,))
+        self.assertEqual(tuple(log_probs.shape), (batch_size,))
         self.assertEqual(tuple(activations.shape), (batch_size, max_num_act))
         self.assertEqual(tuple(connections.shape), (batch_size, max_num_act, max_num_emitting))
 
@@ -198,7 +199,7 @@ class TestGraphGRU(unittest.TestCase):
     def test_sampling_size_constraints(self):
         batch_size = 5
         num_int = 3
-        num_intermediate, activations, connections = self.graphgru.sample_graph_tensors(batch_size, max_intermediate_vertices=num_int, 
+        num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(batch_size, max_intermediate_vertices=num_int, 
                                                                                                     min_intermediate_vertices=num_int)
         self.assertEqual(tuple(activations.shape), (batch_size, num_int + self.num_output))
         self.assertEqual((num_intermediate - num_int).abs().sum(), 0)

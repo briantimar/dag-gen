@@ -510,4 +510,6 @@ class GraphGRU(ScalarGraphGRU):
             connections[i, ni:ni+self.output_dim, ...] = connections[i,-self.output_dim:, ... ]
             connections[i, ni+self.output_dim:, ...] = 0 
         
-        return num_intermediate, activations, connections
+        log_probs = torch.stack(log_probs_by_vertex, dim=1).sum(dim=1)
+
+        return num_intermediate, activations, connections, log_probs
