@@ -162,6 +162,7 @@ class TestGraphGRU(unittest.TestCase):
         self.graphgru = GraphGRU(self.num_input, self.num_output, hidden_size, logits_hidden_size, self.num_activations)
 
     def test__sample_graph_tensors_resolved(self):
+        """ Check that vertex-resolved tensors have the expected shape"""
         batch_size = 2
         lengths, all_connections, activations, log_probs = self.graphgru._sample_graph_tensors_resolved(batch_size)
         maxnum = lengths.max().item()
@@ -171,6 +172,7 @@ class TestGraphGRU(unittest.TestCase):
         self.assertEqual(len(all_connections), len(activations))
 
     def test_sample_graph_tensors(self):
+        """ Check that sampled graph tensors have the correct shape"""
         batch_size=5
         num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(batch_size)
         maxnum = num_intermediate.max().item()
@@ -197,6 +199,7 @@ class TestGraphGRU(unittest.TestCase):
                 self.assertEqual( connections[i, j, num_emitting:].sum().item(), 0)
 
     def test_sampling_size_constraints(self):
+        """Check that constraints on min/max number of intermediate vertices are obeyed."""
         batch_size = 5
         num_int = 3
         num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(batch_size, max_intermediate_vertices=num_int, 
@@ -227,10 +230,12 @@ class TestDAG(unittest.TestCase):
                     self.connections, self.activations)
 
 
-    def test_shape(self):
+    def test_build(self):
+        """Check that the DAG builds"""
         pass
 
     def test_forward_shape(self):
+        """Check that forward pass produces outputs of expected shape."""
         activation_functions = [lambda x: x, lambda x: -x, torch.relu, torch.cos]
         x = torch.randn(self.input_dim)
         y = self.dag.forward(x, activation_functions)
