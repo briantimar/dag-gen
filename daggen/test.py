@@ -200,7 +200,6 @@ class TestGraphGRU(unittest.TestCase):
         num_int = 3
         num_intermediate, activations, connections = self.graphgru.sample_graph_tensors(batch_size, max_intermediate_vertices=num_int, 
                                                                                                     min_intermediate_vertices=num_int)
-        print(num_intermediate)
         self.assertEqual(tuple(activations.shape), (batch_size, num_int + self.num_output))
         self.assertEqual((num_intermediate - num_int).abs().sum(), 0)
 
