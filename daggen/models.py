@@ -61,6 +61,11 @@ class ScalarTorchDag:
             if i > 0:
                 y[~self.active_vertices[:, i], i] = y[~self.active_vertices[:, i], i-1]
         return y[:, -1]
+
+    def to_graphviz(self):
+        """Return graphvis objects representing each graph in the batch"""
+        pass
+
             
 
 class MLP(torch.nn.Module):

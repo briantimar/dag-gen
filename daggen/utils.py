@@ -45,4 +45,26 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
         
         Returns: graphviz digraph"""
     
-    pass
+    if not is_valid_adjacency_matrix(connections, num_intermediate, input_dim, output_dim):
+        raise ValueError("Connectivity matrix is invalid")
+    num_emitting = num_intermediate + input_dim
+    num_receiving = num_intermediate + output_dim
+    size = num_emitting + output_dim
+    dag = graphviz.Digraph()
+    #add nodes labeled by activation functions
+    for i in range(size):
+        node=str(i)
+        if i < input_dim:
+            label = ''
+        else:
+            label = activation_labels[activations[i-input_dim]]
+        dag.node(node, label=label)
+    #add edges
+    edgelist = []
+    for i in range(num_receiving):
+        rec_index = i + input_dim
+        for emitting_index in range(rec_index):
+            if connections[i, emitting_index] > 0:
+                edgelist.append(f'{emitting_index}{rec_index}')
+    dag.edges(edgelist)
+    return dag

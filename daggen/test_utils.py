@@ -1,8 +1,7 @@
 import unittest
 import torch
 
-class TestDAGChecks(unittest.TestCase):
-    """Check whether DAG-testing functions work as expected."""
+class TestDAGUtils(unittest.TestCase):
 
     def test_is_valid_adjacency_matrix(self):
         """ Check whether adjacency tensors are correctly identified."""
@@ -24,6 +23,19 @@ class TestDAGChecks(unittest.TestCase):
         self.assertTrue(is_valid_adjacency_matrix(conn1, num_intermediate, input_dim, output_dim))
         for conn in (conn2, conn3, conn4, conn5):
             self.assertFalse(is_valid_adjacency_matrix(conn, num_intermediate, input_dim, output_dim))
+
+    def test_build_graphviz(self):
+        """ Check graphviz constructor."""
+        from .utils import build_graphviz
+        input_dim = 2
+        output_dim = 1
+        num_intermediate = 1
+
+        conns = torch.tensor([[1,1,0], [0, 1, 1]], dtype=torch.uint8)
+        activations = torch.tensor([1, 0], dtype=torch.long)
+        activation_labels = ['id', 'inv']
+        dag = build_graphviz(input_dim, output_dim, num_intermediate, conns, activations, activation_labels)
+        self.assertTrue(dag.directed)
 
 if __name__ == "__main__":
     unittest.main()
