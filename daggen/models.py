@@ -3,7 +3,7 @@
 import torch
 from torch.distributions.categorical import Categorical
 
-class TorchDAG:
+class ScalarTorchDag:
     """ Define and apply batched computational graphs based on torch mask tensors and a list of activation functions."""
 
     def __init__(self, activation_choices, connections, activations, active_vertices):

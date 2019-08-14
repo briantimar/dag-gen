@@ -3,10 +3,10 @@ import torch
 import numpy as np
 
 
-class TestTorchDAG(unittest.TestCase):
+class TestScalarTorchDag(unittest.TestCase):
 
     def setUp(self):
-        from .models import TorchDAG
+        from .models import ScalarTorchDag
 
         self.activation_choices = [torch.relu, lambda x: .5 * x]
         batch_size = 2
@@ -24,7 +24,7 @@ class TestTorchDAG(unittest.TestCase):
         activations[1, 1] = 1
         activations[1, 2] = 1
 
-        self.dag = TorchDAG(self.activation_choices, connections, activations, active_vertices)
+        self.dag = ScalarTorchDag(self.activation_choices, connections, activations, active_vertices)
 
     def test_init(self):
         self.assertEqual(len(self.activation_choices), self.dag.num_activations)
