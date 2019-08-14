@@ -467,14 +467,17 @@ class GraphGRU(ScalarGraphGRU):
         
         Let maxnum denote the max number of intermediate vertices among all sampled graphs. Then return values are
                 `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each sampled graph.
-                `connections` (N, maxnum + output_dim, maxnum + input_dim) byte tensor. The i, j, k element is nonzero iff a connection k -> j exists in the ith graph.
+                `connections` (N, maxnum + output_dim, maxnum + input_dim) byte tensor. 
+                    The i, j, k element is nonzero iff a connection k + input_dim -> j + output_dim exists in the ith graph.
                 `activations` (N, maxnum + output_dim) int tensor specifying an activation function to be applied at each intermediate vertex.
+                    Undefined entries (corresponding to vertices not present in sampled graphs) are filled with -1
                     Takes values in 0, ... num_activations -1
                 `log_probs`: (N,) float tensor of log-probabilities assigned to each graph in the batch
         
-        Generally each sampled graph will have less than maxnum intermediate vertices. In these cases, only certain portions of each slice of the returned tensors
+        Generally each sampled graph will have less than maxnum intermediate vertices.
+         In these cases, only certain portions of each slice of the returned tensors
         are actually used to specify a graph. Suppose the ith graph has n intermediate vertices. Then:
-            Its activations are specified in activations[i, -(n+output_dim):]
+            Its activations are specified in activations[i, :(n+output_dim)]
             Its connections are specified in connections[i, :(n + output_dim), :(n + input_dim)]
         The other entries of these tensors (for a particular batch index) should be ignored.
 
