@@ -4,7 +4,8 @@ import torch
 from torch.distributions.categorical import Categorical
 
 class ScalarTorchDag:
-    """ Define and apply batched computational graphs based on torch mask tensors and a list of activation functions."""
+    """ Define and apply batched computational graphs based on torch mask tensors and a list of activation functions.
+        Only allows for scalar inputs and outputs."""
 
     def __init__(self, activation_choices, connections, activations, active_vertices):
         """ activation_choices: a list of torch activation functions
@@ -62,9 +63,6 @@ class ScalarTorchDag:
         return y[:, -1]
             
 
-
-        
-
 class MLP(torch.nn.Module):
     """Dense network."""
 
@@ -95,6 +93,45 @@ class TwoLayerMLP(MLP):
         self.output_size = output_size
         super().__init__([input_size, hidden_size, output_size], activation=activation)
 
+class DAG:
+    """ Container for (a batch of) DAGs that specify computations"""
+
+    def __init__(self, input_dim, output_dim,
+                num_intermediate, connections, activations):
+        """ `input_dim`: int, the dimensionality of the graph input.
+            `output_dim`: int, the dimensionality of the graph output.
+            `num_intermediate`: (N,) torch long tensor specifying the number of intermediate vertices of each
+            graph in the batch.
+            `connections`: (N, max_int + output_dim, max_int + input_dim) uint8 tensor specifying the adjacency
+            matrix of each graph in the batch.
+            `activations`: (N, max_int + output_dim) int tensor specifying which activation function to apply
+            at each active vertex. 
+
+            Both `connections` and `activations` should be left-justified, ie along each dimension the meaningful
+            values are packed first. The rest is padding.
+            """
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.num_intermediate = num_intermediate
+        self.connections = connections
+        self.activations = activations
+
+        # largest number of intermediate vertices in the batch
+        self.max_int = num_intermediate.max().item()
+        # largest number of receiving vertices
+        self.max_receiving = self.max_int + output_dim
+        # largest number of emitting vertices
+        self.max_emitting = self.max_int + input_dim
+        self.batch_size = self.num_intermediate.size(0)
+
+        if tuple(num_intermediate.shape) != (self.batch_size,):
+            raise ValueError(f"Invalid num_intermediate shape {num_intermediate.shape}")
+        if tuple(connections.shape) != (self.batch_size, self.max_receiving, self.max_emitting):
+            raise ValueError(f"Invalid connections shape {connections.shape}")
+        if tuple(activations.shape) != (self.batch_size, self.max_receiving):
+            raise ValueError(f"Invalid activations shape {activations.shape}")
+    
+
 class GraphRNN(torch.nn.Module):
     """An autoregressive graph model a la https://arxiv.org/abs/1802.08773."""
 
@@ -117,8 +154,6 @@ class GraphRNN(torch.nn.Module):
         self.add_module('vertex_logits', vertex_logits)
         self.add_module('edge_logits', edge_logits)
         self.add_module('activation_logits', activation_logits)
-
-
 
 class ScalarGraphGRU(GraphRNN):
     """ Graph generator which uses GRU cells. Each graph sampled from the distribution accepts a single scalar input."""

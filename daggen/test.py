@@ -204,5 +204,29 @@ class TestGraphGRU(unittest.TestCase):
         self.assertEqual(tuple(activations.shape), (batch_size, num_int + self.num_output))
         self.assertEqual((num_intermediate - num_int).abs().sum(), 0)
 
+class TestDAG(unittest.TestCase):
+
+    def setUp(self):
+        from .models import GraphGRU
+        
+        self.input_dim = 2
+        self.output_dim = 3
+        hidden_size = 2
+        logits_hidden_size = 2
+        self.num_activations = 4
+        self.graphgru = GraphGRU(self.input_dim, self.output_dim, hidden_size, 
+                                logits_hidden_size, self.num_activations)
+
+        self.batch_size = 3
+        num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(self.batch_size)
+        self.num_intermediate = num_intermediate
+        self.activations = activations
+        self.connections = connections
+        
+    def test_shape(self):
+        from .models import DAG
+        dag = DAG(self.input_dim, self.output_dim, self.num_intermediate, 
+                    self.connections, self.activations)
+
 if __name__ == "__main__":
     unittest.main()
