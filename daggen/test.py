@@ -208,7 +208,7 @@ class TestDAG(unittest.TestCase):
 
     def setUp(self):
         from .models import GraphGRU
-        
+        from .models import DAG
         self.input_dim = 2
         self.output_dim = 3
         hidden_size = 2
@@ -223,10 +223,39 @@ class TestDAG(unittest.TestCase):
         self.activations = activations
         self.connections = connections
         
-    def test_shape(self):
-        from .models import DAG
-        dag = DAG(self.input_dim, self.output_dim, self.num_intermediate, 
+        self.dag = DAG(self.input_dim, self.output_dim, self.num_intermediate, 
                     self.connections, self.activations)
+
+
+    def test_shape(self):
+        pass
+
+    def test_forward_shape(self):
+        activation_functions = [lambda x: x, lambda x: -x, torch.relu, torch.cos]
+        x = torch.randn(self.input_dim)
+        y = self.dag.forward(x, activation_functions)
+        self.assertEqual(tuple(y.shape), (self.batch_size, self.output_dim))
+
+    def test_forward(self):
+        """ Check that batched DAGs actually output the correct result for known examples."""
+        from .models import DAG
+        input_dim = 2
+        output_dim = 1
+        activation_functions = [lambda x: x, lambda x : -x ]
+
+        conns0 = torch.tensor([[1,1,0], [0, 1, 1]], dtype=torch.uint8)
+        conns1 = torch.tensor([[1,1,0], [0,0,0]], dtype=torch.uint8)
+        connections = torch.stack((conns0, conns1), dim=0)
+
+        activations = torch.tensor([[1, 0], [0, -1]], dtype=torch.long)
+        num_intermediate = torch.tensor([1, 0], dtype=torch.long)
+
+        dag = DAG(input_dim, output_dim, num_intermediate, connections, activations)
+
+        x = torch.tensor([1, 2], dtype=torch.float)
+        y = dag.forward(x, activation_functions)
+        target = torch.tensor([-1, 3], dtype=torch.float).view(2, 1)
+        self.assertAlmostEqual((y - target).abs().sum().item(), 0)
 
 if __name__ == "__main__":
     unittest.main()

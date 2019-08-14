@@ -107,6 +107,9 @@ class DAG:
             `activations`: (N, max_int + output_dim) int tensor specifying which activation function to apply
             at each active vertex. 
 
+            Here `N` denotes the batch size of the graph tensors, and `max_int` the largest number of 
+            intermediate vertices within the graph batch.
+
             Both `connections` and `activations` should be left-justified, ie along each dimension the meaningful
             values are packed first. The rest is padding.
             """
@@ -122,6 +125,8 @@ class DAG:
         self.max_receiving = self.max_int + output_dim
         # largest number of emitting vertices
         self.max_emitting = self.max_int + input_dim
+        #largest total graph size
+        self.max_size = self.max_receiving + input_dim
         self.batch_size = self.num_intermediate.size(0)
 
         if tuple(num_intermediate.shape) != (self.batch_size,):
@@ -130,6 +135,46 @@ class DAG:
             raise ValueError(f"Invalid connections shape {connections.shape}")
         if tuple(activations.shape) != (self.batch_size, self.max_receiving):
             raise ValueError(f"Invalid activations shape {activations.shape}")
+
+    def forward(self, x, activation_choices):
+        """ Compute forward passes for each of the networks on a single input.
+            `x`: (input_dim,) input tensor 
+            `activation_choices`: list of candidate activation functions.
+            Returns: (N,output_dim), obtained by applying the ith network to the ith element of x.
+            """
+        if tuple(x.shape) != (self.input_dim,):
+            raise ValueError("Invalid input shape {0} for DAG input size {1}".format(x.shape, self.input_dim))
+
+        # tensor to hold intermediate computation results
+        # y[:, i] is the graph value at layer i of the topological sort, 
+        # or zero where the graph computation has already finished. The first input_dim
+        # entries hold the graph input.
+        y = torch.zeros(self.batch_size, self.max_size, dtype=torch.float)
+        emitters = y[:, :self.max_emitting]
+        #initialize with graph inputs
+        y[:, :self.input_dim] = x
+
+        for i in range(self.max_receiving):
+            #which vertices provide inputs to the current vertex
+            #(N, max_emitting)
+            input_vertices = self.connections[:, i, :]
+            #(N,) tensor of summed inputs into the given vertex
+            inputs = input_vertices.to(dtype=torch.float) * emitters
+            summed_input = inputs.sum(dim=1)
+            
+            #(N, NA) tensor of candidate activations
+            all_act = torch.stack([f(summed_input) for f in activation_choices], dim=1)
+            # select the correct activation function for each graph
+            # (N,) tensor holding the output of the ith receiving vertex.
+            output = all_act[range(self.batch_size), self.activations[:, i]]
+            #update the current state of the graph with computation results
+            y[:, i+self.input_dim] = output
+            
+        #the result of each graph's computation is stored at the vertex index set by its length
+        output_start_indices = self.num_intermediate + self.input_dim
+        output_end_indices = self.num_intermediate + self.input_dim + self.output_dim
+        outputs = [ y[i, output_start_indices[i]:output_end_indices[i]] for i in range(self.batch_size)]
+        return torch.stack(outputs, dim=0)
     
 
 class GraphRNN(torch.nn.Module):
