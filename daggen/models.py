@@ -181,6 +181,17 @@ class DAG:
         outputs = [ y[i, output_start_indices[i]:output_end_indices[i]] for i in range(self.batch_size)]
         return torch.stack(outputs, dim=0)
     
+    def to_graphviz(self, activation_labels):
+        """ Returns list of graphviz Digraphs, one for each graph in the batch.
+        `activation_labels`: list of strings to label activation functions"""
+        from .utils import build_graphviz
+        digraphs = []
+        for i in range(self.batch_size):
+            print(f"num_int {self.num_intermediate[i]}")
+        return [build_graphviz(self.input_dim, self.output_dim, self.num_intermediate[i], 
+                                self.connections[i, ...], self.activations[i, ...],activation_labels)
+                                for i in range(self.batch_size)]
+    
 
 class GraphRNN(torch.nn.Module):
     """An autoregressive graph model a la https://arxiv.org/abs/1802.08773."""

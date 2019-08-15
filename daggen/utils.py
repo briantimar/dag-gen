@@ -63,8 +63,8 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
     edgelist = []
     for i in range(num_receiving):
         rec_index = i + input_dim
-        for emitting_index in range(rec_index):
+        for emitting_index in range(min(rec_index, num_emitting)):
             if connections[i, emitting_index] > 0:
-                edgelist.append(f'{emitting_index}{rec_index}')
+                edgelist.append((str(emitting_index), str(rec_index)))
     dag.edges(edgelist)
     return dag

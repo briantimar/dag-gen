@@ -221,7 +221,8 @@ class TestDAG(unittest.TestCase):
                                 logits_hidden_size, self.num_activations)
 
         self.batch_size = 3
-        num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(self.batch_size)
+        num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(self.batch_size, 
+                                                                                                        min_intermediate_vertices=4)
         self.num_intermediate = num_intermediate
         self.activations = activations
         self.connections = connections
@@ -261,6 +262,10 @@ class TestDAG(unittest.TestCase):
         y = dag.forward(x, activation_functions)
         target = torch.tensor([-1, 3], dtype=torch.float).view(2, 1)
         self.assertAlmostEqual((y - target).abs().sum().item(), 0)
+
+    def test_build_graphviz(self):
+        """ Check that digraphs build OK"""
+        digraphs = self.dag.to_graphviz(['a', 'b', 'c', 'd'])
 
 if __name__ == "__main__":
     unittest.main()
