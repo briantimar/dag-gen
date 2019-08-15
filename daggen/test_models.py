@@ -248,6 +248,9 @@ class TestBatchDAG(unittest.TestCase):
         x = torch.randn(self.input_dim)
         y = self.dag.forward(x, activation_functions)
         self.assertEqual(tuple(y.shape), (self.batch_size, self.output_dim))
+        x = torch.randn(3, self.input_dim)
+        y = self.dag.forward(x, activation_functions)
+        self.assertEqual(tuple(y.shape), (3, self.batch_size, self.output_dim))
 
     def test_forward(self):
         """ Check that batched BatchDAGs actually output the correct result for known examples."""
@@ -265,9 +268,9 @@ class TestBatchDAG(unittest.TestCase):
 
         dag = BatchDAG(input_dim, output_dim, num_intermediate, connections, activations)
 
-        x = torch.tensor([1, 2], dtype=torch.float)
+        x = torch.tensor([[1, 2], [0, 3]], dtype=torch.float)
         y = dag.forward(x, activation_functions)
-        target = torch.tensor([-1, 3], dtype=torch.float).view(2, 1)
+        target = torch.tensor([[-1, 3], [0, 3]], dtype=torch.float).view(2, 2, 1)
         self.assertAlmostEqual((y - target).abs().sum().item(), 0)
 
     def test_build_graphviz(self):

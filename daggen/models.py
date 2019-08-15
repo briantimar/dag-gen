@@ -145,43 +145,62 @@ class BatchDAG:
 
     def forward(self, x, activation_choices):
         """ Compute forward passes for each of the networks on a single input.
-            `x`: (input_dim,) input tensor 
+            `x`: (M, input_dim) input tensor 
             `activation_choices`: list of candidate activation functions.
-            Returns: (N,output_dim), obtained by applying the ith network to the ith element of x.
+            Returns: (M, N,output_dim), obtained by applying the ith network to the ith element of x.
             """
-        if tuple(x.shape) != (self.input_dim,):
+        if len(x.shape) == 1:
+            x = x.view(1, -1)
+            is_singleton = True
+        else:
+            is_singleton = False
+
+        if x.size(1) != self.input_dim:
             raise ValueError("Invalid input shape {0} for BatchDAG input size {1}".format(x.shape, self.input_dim))
 
+        data_batch_size = x.size(0)
+
         # tensor to hold intermediate computation results
-        # y[:, i] is the graph value at layer i of the topological sort, 
+        # y[:, :, i] is the graph value at layer i of the topological sort, 
         # or zero where the graph computation has already finished. The first input_dim
         # entries hold the graph input.
-        y = torch.zeros(self.batch_size, self.max_size, dtype=torch.float)
-        emitters = y[:, :self.max_emitting]
+        y = torch.zeros(data_batch_size, self.batch_size, self.max_size, dtype=torch.float)
+        emitters = y[:, :, :self.max_emitting] 
         #initialize with graph inputs
-        y[:, :self.input_dim] = x
+        y[:, :, :self.input_dim] = x.unsqueeze(1)
 
         for i in range(self.max_receiving):
-            #which vertices provide inputs to the current vertex
-            #(N, max_emitting)
-            input_vertices = self.connections[:, i, :]
-            #(N,) tensor of summed inputs into the given vertex
-            inputs = input_vertices.to(dtype=torch.float) * emitters
-            summed_input = inputs.sum(dim=1)
+            #absolute index of the current vertex
+            absolute_index = i + self.input_dim
+            #absolute index of the last vertex which could provide input
+            largest_input_index = min(self.max_emitting, absolute_index)
+            #(N, num_inputs) bool tensor of possible inputs
+            input_vertices = self.connections[:, i, :largest_input_index]
+            #(M, N, num_inputs) float tensor of existing values in the graph
+            input_emitters = emitters[:, :, :largest_input_index]
+            #(M, N, num_inputs) tensor of  inputs into the given vertex
+            inputs = input_vertices.to(dtype=torch.float).unsqueeze(0) * input_emitters
+            #(M, N) tensor of summed inputs at the given vertex
+            summed_input = inputs.sum(dim=-1)
             
-            #(N, NA) tensor of candidate activations
-            all_act = torch.stack([f(summed_input) for f in activation_choices], dim=1)
+            #(M, N, NA) tensor of candidate activations
+            all_act = torch.stack([f(summed_input) for f in activation_choices], dim=-1)
             # select the correct activation function for each graph
-            # (N,) tensor holding the output of the ith receiving vertex.
-            output = all_act[range(self.batch_size), self.activations[:, i]]
+            # (M,N) tensor holding the output of the ith receiving vertex.
+            output = all_act[:, range(self.batch_size), self.activations[:, i]]
             #update the current state of the graph with computation results
-            y[:, i+self.input_dim] = output
+            y[:, :, absolute_index] = output
             
         #the result of each graph's computation is stored at the vertex index set by its length
         output_start_indices = self.num_intermediate + self.input_dim
         output_end_indices = self.num_intermediate + self.input_dim + self.output_dim
-        outputs = [ y[i, output_start_indices[i]:output_end_indices[i]] for i in range(self.batch_size)]
-        return torch.stack(outputs, dim=0)
+        #(M, N, output_dim) tensor of network outputs
+        outputs = [ y[:, i, output_start_indices[i]:output_end_indices[i]] for i in range(self.batch_size)]
+        outputs = torch.stack(outputs, dim=1)
+
+        if is_singleton:
+            outputs = outputs.view(self.batch_size, self.output_dim)
+        return outputs
     
     def to_graphviz(self, activation_labels):
         """ Returns list of graphviz Digraphs, one for each graph in the batch.
