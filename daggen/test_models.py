@@ -200,6 +200,14 @@ class TestBatchDAG(unittest.TestCase):
         """Check that the BatchDAG builds"""
         pass
 
+    def test_iter(self):
+        self.assertEqual(len(self.dag), self.batch_size)
+        dags = [dag for dag in self.dag]
+        self.assertEqual(len(dags), self.batch_size)
+        from .models import DAG
+        for d in dags:
+            self.assertTrue(isinstance(d, DAG))
+
     def test_forward_shape(self):
         """Check that forward pass produces outputs of expected shape."""
         activation_functions = [lambda x: x, lambda x: -x, torch.relu, torch.cos]

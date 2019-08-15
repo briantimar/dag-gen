@@ -40,7 +40,7 @@ class BatchDAG:
     """ Container for (a batch of) BatchDAGs that specify computations"""
 
     def __init__(self, input_dim, output_dim,
-                num_intermediate, connections, activations):
+                num_intermediate, connections, activations, check_shapes=True):
         """ `input_dim`: int, the dimensionality of the graph input.
             `output_dim`: int, the dimensionality of the graph output.
             `num_intermediate`: (N,) torch long tensor specifying the number of intermediate vertices of each
@@ -49,6 +49,8 @@ class BatchDAG:
             matrix of each graph in the batch.
             `activations`: (N, max_int + output_dim) int tensor specifying which activation function to apply
             at each active vertex. 
+            `check_shapes`: Bool, default `True`: whether to check tensor shapes against num_intermediate. 
+                Set to `False` if constructing from a subset of the intermediate sizes used to build the `connections`, `activations` tensors.
 
             Here `N` denotes the batch size of the graph tensors, and `max_int` the largest number of 
             intermediate vertices within the graph batch.
@@ -72,16 +74,23 @@ class BatchDAG:
         self.max_size = self.max_receiving + input_dim
         self.batch_size = self.num_intermediate.size(0)
 
-        if tuple(num_intermediate.shape) != (self.batch_size,):
-            raise ValueError(f"Invalid num_intermediate shape {num_intermediate.shape}")
-        if tuple(connections.shape) != (self.batch_size, self.max_receiving, self.max_emitting):
-            print(f"expecting connections shape ({self.batch_size}, {self.max_receiving}, {self.max_emitting})")
-            raise ValueError(f"Invalid connections shape {connections.shape}")
-        if tuple(activations.shape) != (self.batch_size, self.max_receiving):
-            raise ValueError(f"Invalid activations shape {activations.shape}")
+        if check_shapes:
+            if tuple(num_intermediate.shape) != (self.batch_size,):
+                raise ValueError(f"Invalid num_intermediate shape {num_intermediate.shape}")
+            if tuple(connections.shape) != (self.batch_size, self.max_receiving, self.max_emitting):
+                print(f"expecting connections shape ({self.batch_size}, {self.max_receiving}, {self.max_emitting})")
+                raise ValueError(f"Invalid connections shape {connections.shape}")
+            if tuple(activations.shape) != (self.batch_size, self.max_receiving):
+                raise ValueError(f"Invalid activations shape {activations.shape}")
 
     def __len__(self):
         return self.batch_size
+
+    def __iter__(self):
+        for i in range(self.batch_size):
+            yield DAG(self.input_dim, self.output_dim, self.num_intermediate[i], 
+                        self.connections[i, ...], self.activations[i, ...],check_valid=False)
+
 
     def forward(self, x, activation_choices):
         """ Compute forward passes for each of the networks on a single input.
@@ -183,14 +192,15 @@ class DAG(BatchDAG):
         if not isinstance(num_intermediate, torch.Tensor):
             num_intermediate = torch.tensor(num_intermediate, dtype=torch.long).unsqueeze(0)
         else:
-            if num_intermediate.size(0) > 1:
+            if len(num_intermediate.shape) != 0:
                 raise ValueError(f"Invalid num_intermediate shape {num_intermediate.shape}")
+            num_intermediate= num_intermediate.view(1)
 
         if check_valid:
             if not is_valid_adjacency_matrix(connections[0, ...], num_intermediate[0], input_dim, output_dim):
                 raise ValueError("connections is not a valid adjacency matrix")
 
-        super().__init__(input_dim, output_dim, num_intermediate, connections, activations)
+        super().__init__(input_dim, output_dim, num_intermediate, connections, activations, check_shapes=False)
 
     def __len__(self):
         raise TypeError
@@ -230,10 +240,19 @@ class DAGDistribution(torch.nn.Module):
         returns: BatchDAG, log_probs
             where BatchDAG has len `batch_size` and `log_probs` is (batch_size,) tensor of corresponding log-probabilities.
 
-      """
+        """
         raise NotImplementedError
 
-    
+    def sample_networks_with_log_probs(self, batch_size, min_intermediate_vertices=None,
+                                                    max_intermediate_vertices=None):
+        """ Sample a batch of `batch_size` networkss according to the model distribution.
+            `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
+            `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
+        returns: networks, log_probs
+            where networks has len `batch_size` and `log_probs` is (batch_size,) tensor of corresponding log-probabilities.
+        Each network should implement a forward() method which accepts batched tensor inputs.
+        """
+        raise NotImplementedError
        
 
 class GraphRNN(DAGDistribution):
@@ -669,3 +688,15 @@ class GraphGRU(ScalarGraphGRU):
         batched_dag = BatchDAG(self.input_dim, self.output_dim, 
                             num_intermediate, connections, activations )
         return batched_dag, log_probs
+
+    def sample_networks_with_log_probs(self, batch_size, min_intermediate_vertices=None,
+                                                    max_intermediate_vertices=None):
+        """ Sample a batch of `batch_size` networks according to the model distribution.
+            `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
+            `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
+        returns: networks, log_probs
+            where networks has len `batch_size` and `log_probs` is (batch_size,) tensor of corresponding log-probabilities.
+        """
+        batchdag, log_probs = self.sample_dags_with_log_probs(batch_size, min_intermediate_vertices=min_intermediate_vertices, 
+                                                                            max_intermediate_vertices=max_intermediate_vertices)
+        networks = []
