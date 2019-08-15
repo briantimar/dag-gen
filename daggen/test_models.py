@@ -199,7 +199,7 @@ class TestGraphGRU(unittest.TestCase):
                 self.assertEqual( connections[i, j, num_emitting:].sum().item(), 0)
     
     def test_sample_dags_with_log_probs(self):
-        """ Check that DAG sampling works"""
+        """ Check that BatchDAG sampling works"""
         batch_size = 2
         dags, log_probs = self.graphgru.sample_dags_with_log_probs(batch_size)
         self.assertEqual(tuple(log_probs.shape), (batch_size,))
@@ -214,11 +214,11 @@ class TestGraphGRU(unittest.TestCase):
         self.assertEqual(tuple(activations.shape), (batch_size, num_int + self.num_output))
         self.assertEqual((num_intermediate - num_int).abs().sum(), 0)
 
-class TestDAG(unittest.TestCase):
+class TestBatchDAG(unittest.TestCase):
 
     def setUp(self):
         from .models import GraphGRU
-        from .models import DAG
+        from .models import BatchDAG
         self.input_dim = 2
         self.output_dim = 3
         hidden_size = 2
@@ -234,12 +234,12 @@ class TestDAG(unittest.TestCase):
         self.activations = activations
         self.connections = connections
         
-        self.dag = DAG(self.input_dim, self.output_dim, self.num_intermediate, 
+        self.dag = BatchDAG(self.input_dim, self.output_dim, self.num_intermediate, 
                     self.connections, self.activations)
 
 
     def test_build(self):
-        """Check that the DAG builds"""
+        """Check that the BatchDAG builds"""
         pass
 
     def test_forward_shape(self):
@@ -250,8 +250,8 @@ class TestDAG(unittest.TestCase):
         self.assertEqual(tuple(y.shape), (self.batch_size, self.output_dim))
 
     def test_forward(self):
-        """ Check that batched DAGs actually output the correct result for known examples."""
-        from .models import DAG
+        """ Check that batched BatchDAGs actually output the correct result for known examples."""
+        from .models import BatchDAG
         input_dim = 2
         output_dim = 1
         activation_functions = [lambda x: x, lambda x : -x ]
@@ -263,7 +263,7 @@ class TestDAG(unittest.TestCase):
         activations = torch.tensor([[1, 0], [0, -1]], dtype=torch.long)
         num_intermediate = torch.tensor([1, 0], dtype=torch.long)
 
-        dag = DAG(input_dim, output_dim, num_intermediate, connections, activations)
+        dag = BatchDAG(input_dim, output_dim, num_intermediate, connections, activations)
 
         x = torch.tensor([1, 2], dtype=torch.float)
         y = dag.forward(x, activation_functions)

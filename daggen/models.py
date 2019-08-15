@@ -39,7 +39,7 @@ class ScalarTorchDag:
             Returns: (N,), obtained by applying the ith network to the ith element of x.
             """
         if tuple(x.shape) != (self.batch_size,):
-            raise ValueError("Invalid input shape {0} for DAG batch size {1}".format(x.shape, self.batch_size))
+            raise ValueError("Invalid input shape {0} for BatchDAG batch size {1}".format(x.shape, self.batch_size))
 
         # tensor to hold intermediate computation results
         # y[:, i] is the graph value at layer i of the topological sort, or zero where the graph computation has already finished
@@ -65,8 +65,6 @@ class ScalarTorchDag:
     def to_graphviz(self):
         """Return graphvis objects representing each graph in the batch"""
         pass
-
-            
 
 class MLP(torch.nn.Module):
     """Dense network."""
@@ -98,8 +96,8 @@ class TwoLayerMLP(MLP):
         self.output_size = output_size
         super().__init__([input_size, hidden_size, output_size], activation=activation)
 
-class DAG:
-    """ Container for (a batch of) DAGs that specify computations"""
+class BatchDAG:
+    """ Container for (a batch of) BatchDAGs that specify computations"""
 
     def __init__(self, input_dim, output_dim,
                 num_intermediate, connections, activations):
@@ -152,7 +150,7 @@ class DAG:
             Returns: (N,output_dim), obtained by applying the ith network to the ith element of x.
             """
         if tuple(x.shape) != (self.input_dim,):
-            raise ValueError("Invalid input shape {0} for DAG input size {1}".format(x.shape, self.input_dim))
+            raise ValueError("Invalid input shape {0} for BatchDAG input size {1}".format(x.shape, self.input_dim))
 
         # tensor to hold intermediate computation results
         # y[:, i] is the graph value at layer i of the topological sort, 
@@ -616,13 +614,13 @@ class GraphGRU(ScalarGraphGRU):
 
     def sample_dags_with_log_probs(self, batch_size, min_intermediate_vertices=None,
                                                     max_intermediate_vertices=None):
-        """ Sample a batch of `batch_size` DAGs according to the GraphGRU's distribution.
+        """ Sample a batch of `batch_size` BatchDAGs according to the GraphGRU's distribution.
             `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
             `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
       """
         num_intermediate, activations, connections, log_probs = self.sample_graph_tensors(batch_size, 
                                                     max_intermediate_vertices=max_intermediate_vertices,
                                                     min_intermediate_vertices=min_intermediate_vertices)
-        batched_dag = DAG(self.input_dim, self.output_dim, 
+        batched_dag = BatchDAG(self.input_dim, self.output_dim, 
                             num_intermediate, connections, activations )
         return batched_dag, log_probs
