@@ -278,5 +278,39 @@ class TestBatchDAG(unittest.TestCase):
         digraphs = self.dag.to_graphviz(['a', 'b', 'c', 'd'])
         self.assertEqual(len(digraphs), self.batch_size)
 
+class TestDAG(unittest.TestCase):
+
+    def setUp(self):
+        from .models import DAG
+        self.input_dim = 1
+        self.output_dim = 2
+        num_intermediate = 1
+        connections = torch.tensor( [[1, 0], [ 1, 1 ], [1, 1]],dtype=torch.uint8)
+        activations = torch.tensor([0, 0, 1], dtype=torch.long)
+        
+        self.dag = DAG(self.input_dim, self.output_dim, num_intermediate, connections, activations)
+
+
+    def test_build(self):
+        from .models import DAG
+        input_dim = 1
+        output_dim = 2
+        num_intermediate = 1
+        connections = torch.tensor( [[1, 0], [ 1, 1 ], [1, 1]],dtype=torch.uint8)
+        activations = torch.tensor([0, 0, 1], dtype=torch.long)
+        
+        valid_dag = DAG(input_dim, output_dim, num_intermediate, connections, activations, check_valid=True)
+
+        invalid_connections = torch.tensor( [[1, 1], [ 1, 1 ], [1, 1]],dtype=torch.uint8)
+        with self.assertRaises(ValueError):
+            invalid_dag = DAG(input_dim, output_dim, num_intermediate, invalid_connections, activations, check_valid=True)
+
+    def test_forward(self):
+        x = torch.tensor([0, 1]).view(2, 1)
+        activation_choices = [lambda x: x, lambda x: torch.ones_like(x)]
+        y = self.dag.forward(x, activation_choices)
+        target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
+        self.assertAlmostEqual( (y - target).abs().sum().item(), 0)
+
 if __name__ == "__main__":
     unittest.main()

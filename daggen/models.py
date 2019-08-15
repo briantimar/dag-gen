@@ -2,6 +2,7 @@
 
 import torch
 from torch.distributions.categorical import Categorical
+from .utils import is_valid_adjacency_matrix
 
 class ScalarTorchDag:
     """ Define and apply batched computational graphs based on torch mask tensors and a list of activation functions.
@@ -210,6 +211,59 @@ class BatchDAG:
                                 self.connections[i, ...], self.activations[i, ...],activation_labels)
                                 for i in range(self.batch_size)]
 
+class DAG(BatchDAG):
+    """ For convenience -- represents a single DAG, has no graph batch dimension. """
+
+    def __init__(self,input_dim, output_dim,
+                num_intermediate, connections, activations, check_valid=False):
+        """ `input_dim`: int, the dimensionality of the graph input.
+            `output_dim`: int, the dimensionality of the graph output.
+            `num_intermediate`: int specifying the number of intermediate vertices of each
+            graph in the batch.
+            `connections`: (max_int + output_dim, max_int + input_dim) uint8 tensor specifying the adjacency
+            matrix of each graph in the batch.
+            `activations`: (max_int + output_dim) int tensor specifying which activation function to apply
+            at each active vertex. 
+            `check_valid`: Bool, default `False`: check whether connections is a valid adjacency matrix.
+
+            Here `max_int` denotes the largest number of intermediate vertices within the graph batch.
+
+            Both `connections` and `activations` should be left-justified, ie along each dimension the meaningful
+            values are packed first. The rest is padding.
+            """
+        if len(connections.shape) < 3:
+            connections = connections.unsqueeze(0)
+        else:
+            if connections.size(0) > 1:
+                raise ValueError(f"Invalid connections shape {connections.shape}")
+        if len(activations.shape) < 3:
+            activations = activations.unsqueeze(0)
+        else:
+            if activations.size(0) > 1:
+                raise ValueError(f"Invalid activations shape {activations.shape}")
+        if not isinstance(num_intermediate, torch.Tensor):
+            num_intermediate = torch.tensor(num_intermediate, dtype=torch.long).unsqueeze(0)
+        else:
+            if num_intermediate.size(0) > 1:
+                raise ValueError(f"Invalid num_intermediate shape {num_intermediate.shape}")
+
+        if check_valid:
+            if not is_valid_adjacency_matrix(connections[0, ...], num_intermediate[0], input_dim, output_dim):
+                raise ValueError("connections is not a valid adjacency matrix")
+
+        super().__init__(input_dim, output_dim, num_intermediate, connections, activations)
+
+    def __len__(self):
+        raise TypeError
+
+    def forward(self, x, activation_choices):
+        """ Compute forward through the dag
+        `x`: (M, input_dim) input tensor 
+        `activation_choices`: list of candidate activation functions.
+        Returns: (M, output_dim), obtained by applying the ith network to the ith element of x.
+        """
+        y = super().forward(x, activation_choices)
+        return y.view(x.size(0), self.output_dim)
 
 class DAGDistribution(torch.nn.Module):
     """ PyTorch model which defines a distribution over directed acyclic graphs. 
@@ -231,6 +285,8 @@ class DAGDistribution(torch.nn.Module):
 
       """
         raise NotImplementedError
+
+    
        
 
 class GraphRNN(DAGDistribution):
