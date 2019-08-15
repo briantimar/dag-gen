@@ -137,9 +137,13 @@ class DAG:
         if tuple(num_intermediate.shape) != (self.batch_size,):
             raise ValueError(f"Invalid num_intermediate shape {num_intermediate.shape}")
         if tuple(connections.shape) != (self.batch_size, self.max_receiving, self.max_emitting):
+            print(f"expecting connections shape ({self.batch_size}, {self.max_receiving}, {self.max_emitting})")
             raise ValueError(f"Invalid connections shape {connections.shape}")
         if tuple(activations.shape) != (self.batch_size, self.max_receiving):
             raise ValueError(f"Invalid activations shape {activations.shape}")
+
+    def __len__(self):
+        return self.batch_size
 
     def forward(self, x, activation_choices):
         """ Compute forward passes for each of the networks on a single input.
@@ -609,3 +613,16 @@ class GraphGRU(ScalarGraphGRU):
         log_probs = torch.stack(log_probs_by_vertex, dim=1).sum(dim=1)
 
         return num_intermediate, activations, connections, log_probs
+
+    def sample_dags_with_log_probs(self, batch_size, min_intermediate_vertices=None,
+                                                    max_intermediate_vertices=None):
+        """ Sample a batch of `batch_size` DAGs according to the GraphGRU's distribution.
+            `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
+            `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
+      """
+        num_intermediate, activations, connections, log_probs = self.sample_graph_tensors(batch_size, 
+                                                    max_intermediate_vertices=max_intermediate_vertices,
+                                                    min_intermediate_vertices=min_intermediate_vertices)
+        batched_dag = DAG(self.input_dim, self.output_dim, 
+                            num_intermediate, connections, activations )
+        return batched_dag, log_probs

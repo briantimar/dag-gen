@@ -197,6 +197,13 @@ class TestGraphGRU(unittest.TestCase):
             self.assertEqual( connections[i, num_act:, ...].sum().item(), 0)
             for j in range(num_act):
                 self.assertEqual( connections[i, j, num_emitting:].sum().item(), 0)
+    
+    def test_sample_dags_with_log_probs(self):
+        """ Check that DAG sampling works"""
+        batch_size = 2
+        dags, log_probs = self.graphgru.sample_dags_with_log_probs(batch_size)
+        self.assertEqual(tuple(log_probs.shape), (batch_size,))
+        self.assertEqual(len(dags), batch_size)
 
     def test_sampling_size_constraints(self):
         """Check that constraints on min/max number of intermediate vertices are obeyed."""
