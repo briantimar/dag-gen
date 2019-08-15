@@ -209,9 +209,31 @@ class BatchDAG:
         return [build_graphviz(self.input_dim, self.output_dim, self.num_intermediate[i], 
                                 self.connections[i, ...], self.activations[i, ...],activation_labels)
                                 for i in range(self.batch_size)]
-    
 
-class GraphRNN(torch.nn.Module):
+
+class DAGDistribution(torch.nn.Module):
+    """ PyTorch model which defines a distribution over directed acyclic graphs. 
+        Should provide:
+            * exact sampling from model distribution
+            * tractable log-likelihood
+        """
+    
+    def __init__(self):
+        super().__init__()
+
+    def sample_dags_with_log_probs(self, batch_size, min_intermediate_vertices=None,
+                                                    max_intermediate_vertices=None):
+        """ Sample a batch of `batch_size` BatchDAGs according to the model distribution.
+            `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
+            `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
+        returns: BatchDAG, log_probs
+            where BatchDAG has len `batch_size` and `log_probs` is (batch_size,) tensor of corresponding log-probabilities.
+
+      """
+        raise NotImplementedError
+       
+
+class GraphRNN(DAGDistribution):
     """An autoregressive graph model a la https://arxiv.org/abs/1802.08773."""
 
     def __init__(self, vertex_cell, edge_cell, activation_cell, 
@@ -233,6 +255,7 @@ class GraphRNN(torch.nn.Module):
         self.add_module('vertex_logits', vertex_logits)
         self.add_module('edge_logits', edge_logits)
         self.add_module('activation_logits', activation_logits)
+
 
 class ScalarGraphGRU(GraphRNN):
     """ Graph generator which uses GRU cells. Each graph sampled from the distribution accepts a single scalar input."""
