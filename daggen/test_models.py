@@ -222,7 +222,7 @@ class TestDAG(unittest.TestCase):
 
         self.batch_size = 3
         num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(self.batch_size, 
-                                                                                                        min_intermediate_vertices=4)
+                                                                                                      )
         self.num_intermediate = num_intermediate
         self.activations = activations
         self.connections = connections
@@ -266,6 +266,7 @@ class TestDAG(unittest.TestCase):
     def test_build_graphviz(self):
         """ Check that digraphs build OK"""
         digraphs = self.dag.to_graphviz(['a', 'b', 'c', 'd'])
+        self.assertEqual(len(digraphs), self.batch_size)
 
 if __name__ == "__main__":
     unittest.main()
