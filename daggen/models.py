@@ -4,68 +4,7 @@ import torch
 from torch.distributions.categorical import Categorical
 from .utils import is_valid_adjacency_matrix
 
-class ScalarTorchDag:
-    """ Define and apply batched computational graphs based on torch mask tensors and a list of activation functions.
-        Only allows for scalar inputs and outputs."""
 
-    def __init__(self, activation_choices, connections, activations, active_vertices):
-        """ activation_choices: a list of torch activation functions
-            connections: (N, max_vertices, max_vertices) tensor defining connections between neurons
-            activations: (N, max_vertices) tensor specifying which activations are to be applied at the output of each vertex.
-            active_vertices: (N, max_vertices) unit8 tensor specifying how many vertices of each graph are used.
-        """
-        self.activation_choices = activation_choices
-        self.num_activations = len(activation_choices)
-        self.connections = connections
-        self.activations = activations
-        self.active_vertices = active_vertices
-
-        self.max_vertices = self.activations.size(1)
-        self.batch_size = self.activations.size(0)
-
-        if tuple(connections.shape) != (self.batch_size, self.max_vertices, self.max_vertices):
-            raise ValueError("Invalid connections shape {0}".format(connections.shape))
-        if tuple(activations.shape) != (self.batch_size, self.max_vertices):
-            raise ValueError("Invalid activations shape {0}".format(activations.shape))
-        if tuple(active_vertices.shape) != (self.batch_size, self.max_vertices):
-            raise ValueError("Invalid active_vertices shape {0}".format(active_vertices.shape))
-
-        nact = self.active_vertices[:, 0].sum().item()
-        if nact != self.batch_size:
-            raise ValueError("All initial vertices should be active")
-
-    def forward(self, x):
-        """ Compute forward passes for each of the networks.
-            `x`: (N,) tensor 
-            Returns: (N,), obtained by applying the ith network to the ith element of x.
-            """
-        if tuple(x.shape) != (self.batch_size,):
-            raise ValueError("Invalid input shape {0} for BatchDAG batch size {1}".format(x.shape, self.batch_size))
-
-        # tensor to hold intermediate computation results
-        # y[:, i] is the graph value at layer i of the topological sort, or zero where the graph computation has already finished
-        y = torch.zeros(self.batch_size, self.max_vertices, dtype=torch.float)
-        inputs = torch.zeros_like(y)
-        
-        for i in range(self.max_vertices):
-            if i == 0:
-                summed_input = x
-            else:
-                input_vertices = self.connections[:, i, :]
-                inputs.copy_(y)
-                inputs[~input_vertices] = 0
-                summed_input = inputs.sum(dim=1)
-            
-            all_act = torch.stack([f(summed_input) for f in self.activation_choices], dim=1)
-            output = all_act[range(self.batch_size), self.activations[:, i]]
-            y[self.active_vertices[:, i], i] = output[self.active_vertices[:, i]]
-            if i > 0:
-                y[~self.active_vertices[:, i], i] = y[~self.active_vertices[:, i], i-1]
-        return y[:, -1]
-
-    def to_graphviz(self):
-        """Return graphvis objects representing each graph in the batch"""
-        pass
 
 class MLP(torch.nn.Module):
     """Dense network."""

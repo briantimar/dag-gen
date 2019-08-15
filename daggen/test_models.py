@@ -2,48 +2,6 @@ import unittest
 import torch
 import numpy as np
 
-
-class TestScalarTorchDag(unittest.TestCase):
-
-    def setUp(self):
-        from .models import ScalarTorchDag
-
-        self.activation_choices = [torch.relu, lambda x: .5 * x]
-        batch_size = 2
-        self.batch_size = batch_size
-        max_v = 3
-        connections = torch.zeros(batch_size, max_v, max_v,dtype=torch.uint8)
-        connections[0, 1, 0] = 1
-        connections[1, 1, 0] = 1
-        connections[1, 2, :2] = 1
-        active_vertices = torch.ones(batch_size, max_v, dtype=torch.uint8)
-        active_vertices[0, 2] = 0
-
-        activations = torch.zeros(batch_size, max_v,dtype=torch.long)
-        activations[0, 1] = 1
-        activations[1, 1] = 1
-        activations[1, 2] = 1
-
-        self.dag = ScalarTorchDag(self.activation_choices, connections, activations, active_vertices)
-
-    def test_init(self):
-        self.assertEqual(len(self.activation_choices), self.dag.num_activations)
-
-    def test_forward(self):
-        x = torch.arange(self.batch_size+1, dtype=torch.float)
-        with self.assertRaises(ValueError):
-            y = self.dag.forward(x)
-
-        x0 = torch.tensor(1.0)
-        x = x0.expand(self.batch_size)
-        y = self.dag.forward(x)
-        self.assertEqual(tuple(y.shape), (self.batch_size,))
-        
-        target_0 = .5 * x0
-        target_1 = .5 * (.5 * x0 + x0)
-        target = torch.stack((target_0, target_1))
-        self.assertAlmostEqual( (y-target).abs().sum().item(), 0)
-
 class TestMLP(unittest.TestCase):
 
     def setUp(self):
