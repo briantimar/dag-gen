@@ -265,6 +265,14 @@ class DAG(BatchDAG):
         y = super().forward(x, activation_choices)
         return y.view(x.size(0), self.output_dim)
 
+    def to_graphviz(self, activation_labels):
+        """ Returns a graphviz Digraphs
+        `activation_labels`: list of strings to label activation functions"""
+        from .utils import build_graphviz
+        return build_graphviz(self.input_dim, self.output_dim, self.num_intermediate[0], 
+                                self.connections[0, ...], self.activations[0, ...],activation_labels)
+           
+
 class DAGDistribution(torch.nn.Module):
     """ PyTorch model which defines a distribution over directed acyclic graphs. 
         Should provide:

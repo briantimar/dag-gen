@@ -312,5 +312,10 @@ class TestDAG(unittest.TestCase):
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
         self.assertAlmostEqual( (y - target).abs().sum().item(), 0)
 
+    def test_to_graphviz(self):
+        from graphviz import Digraph
+        g = self.dag.to_graphviz(['a', 'b'])
+        self.assertTrue(isinstance(g, Digraph))
+
 if __name__ == "__main__":
     unittest.main()
