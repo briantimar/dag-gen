@@ -41,7 +41,7 @@ class BatchDAG:
 
     def __init__(self, input_dim, output_dim,
                 num_intermediate, connections, activations, 
-                activation_functions=None, check_shapes=True):
+                activation_functions=None, activation_labels=None, check_shapes=True):
         """ `input_dim`: int, the dimensionality of the graph input.
             `output_dim`: int, the dimensionality of the graph output.
             `num_intermediate`: (N,) torch long tensor specifying the number of intermediate vertices of each
@@ -65,7 +65,15 @@ class BatchDAG:
         self.num_intermediate = num_intermediate
         self.connections = connections
         self.activations = activations
+
+        if activation_functions is not None:
+            if activation_labels is not None and len(activation_functions) != len(activation_labels):
+                raise ValueError("Must provide exactly one label per activation")
+            if activation_labels is None:
+                activation_labels = [f"fn{i}" for i in range(len(activation_functions))]
         self.activation_functions = activation_functions
+        self.activation_labels = activation_labels
+        
         # largest number of intermediate vertices in the batch
         self.max_int = num_intermediate.max().item()
         # largest number of receiving vertices
@@ -92,7 +100,8 @@ class BatchDAG:
         for i in range(self.batch_size):
             yield DAG(self.input_dim, self.output_dim, self.num_intermediate[i], 
                         self.connections[i, ...], self.activations[i, ...],
-                        activation_functions=self.activation_functions,check_valid=False)
+                        activation_functions=self.activation_functions,
+                        activation_labels=self.activation_labels,check_valid=False)
 
 
     def _forward_with(self, x, activation_choices):
@@ -163,20 +172,17 @@ class BatchDAG:
         return self._forward_with(x, self.activation_functions)
 
     
-    def to_graphviz(self, activation_labels):
+    def to_graphviz(self):
         """ Returns list of graphviz Digraphs, one for each graph in the batch.
         `activation_labels`: list of strings to label activation functions"""
-        from .utils import build_graphviz
-        return [build_graphviz(self.input_dim, self.output_dim, self.num_intermediate[i], 
-                                self.connections[i, ...], self.activations[i, ...],activation_labels)
-                                for i in range(self.batch_size)]
+        return [d.to_graphviz() for d in self]
 
 class DAG(BatchDAG):
     """ For convenience -- represents a single DAG, has no graph batch dimension. """
 
     def __init__(self,input_dim, output_dim,
                 num_intermediate, connections, activations,
-                activation_functions = None, check_valid=False):
+                activation_functions = None, activation_labels = None, check_valid=False):
         """ `input_dim`: int, the dimensionality of the graph input.
             `output_dim`: int, the dimensionality of the graph output.
             `num_intermediate`: int specifying the number of intermediate vertices of each
@@ -215,7 +221,9 @@ class DAG(BatchDAG):
                 raise ValueError("connections is not a valid adjacency matrix")
 
         super().__init__(input_dim, output_dim, num_intermediate, connections, activations, 
-                        activation_functions=activation_functions, check_shapes=False)
+                        activation_functions=activation_functions,
+                        activation_labels=activation_labels, check_shapes=False)
+
 
     def __len__(self):
         raise TypeError
@@ -238,12 +246,14 @@ class DAG(BatchDAG):
         return y.view(x.size(0), self.output_dim)
 
 
-    def to_graphviz(self, activation_labels):
+    def to_graphviz(self):
         """ Returns a graphviz Digraphs
-        `activation_labels`: list of strings to label activation functions"""
+        """
+        if self.activation_labels is None:
+            raise ValueError("Must specify activation labels before generating graphviz")
         from .utils import build_graphviz
         return build_graphviz(self.input_dim, self.output_dim, self.num_intermediate[0], 
-                                self.connections[0, ...], self.activations[0, ...],activation_labels)
+                                self.connections[0, ...], self.activations[0, ...],self.activation_labels)
            
 
 class DAGDistribution(torch.nn.Module):

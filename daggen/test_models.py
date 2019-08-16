@@ -202,6 +202,7 @@ class TestBatchDAG(unittest.TestCase):
         
         self.dag = BatchDAG(self.input_dim, self.output_dim, self.num_intermediate, 
                     self.connections, self.activations)
+        self.dag.activation_labels = ['a', 'b', 'c', 'd']
 
 
     def test_build(self):
@@ -256,7 +257,7 @@ class TestBatchDAG(unittest.TestCase):
 
     def test_build_graphviz(self):
         """ Check that digraphs build OK"""
-        digraphs = self.dag.to_graphviz(['a', 'b', 'c', 'd'])
+        digraphs = self.dag.to_graphviz()
         self.assertEqual(len(digraphs), self.batch_size)
 
 class TestDAG(unittest.TestCase):
@@ -269,7 +270,8 @@ class TestDAG(unittest.TestCase):
         connections = torch.tensor( [[1, 0], [ 1, 1 ], [1, 1]],dtype=torch.uint8)
         activations = torch.tensor([0, 0, 1], dtype=torch.long)
         
-        self.dag = DAG(self.input_dim, self.output_dim, num_intermediate, connections, activations)
+        self.dag = DAG(self.input_dim, self.output_dim, num_intermediate, connections, activations, 
+                                activation_labels=('a', 'b'))
 
 
     def test_build(self):
@@ -304,7 +306,7 @@ class TestDAG(unittest.TestCase):
 
     def test_to_graphviz(self):
         from graphviz import Digraph
-        g = self.dag.to_graphviz(['a', 'b'])
+        g = self.dag.to_graphviz()
         self.assertTrue(isinstance(g, Digraph))
 
 if __name__ == "__main__":
