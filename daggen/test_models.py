@@ -172,6 +172,12 @@ class TestGraphGRU(unittest.TestCase):
         self.assertEqual(tuple(activations.shape), (batch_size, num_int + self.num_output))
         self.assertEqual((num_intermediate - num_int).abs().sum(), 0)
 
+    def test_sample_networks_with_log_probs(self):
+        batch_size = 5
+        networks, log_probs = self.graphgru.sample_networks_with_log_probs(batch_size)
+        self.assertEqual( len(networks), batch_size)
+        self.assertEqual( tuple(log_probs.shape), (batch_size,))
+
 class TestBatchDAG(unittest.TestCase):
 
     def setUp(self):
@@ -212,13 +218,13 @@ class TestBatchDAG(unittest.TestCase):
         """Check that forward pass produces outputs of expected shape."""
         activation_functions = [lambda x: x, lambda x: -x, torch.relu, torch.cos]
         x = torch.randn(self.input_dim)
-        y = self.dag.forward(x, activation_functions)
+        y = self.dag._forward_with(x, activation_functions)
         self.assertEqual(tuple(y.shape), (self.batch_size, self.output_dim))
         x = torch.randn(3, self.input_dim)
-        y = self.dag.forward(x, activation_functions)
+        y = self.dag._forward_with(x, activation_functions)
         self.assertEqual(tuple(y.shape), (3, self.batch_size, self.output_dim))
 
-    def test_forward(self):
+    def test__forward_with(self):
         """ Check that batched BatchDAGs actually output the correct result for known examples."""
         from .models import BatchDAG
         input_dim = 2
@@ -235,7 +241,7 @@ class TestBatchDAG(unittest.TestCase):
         dag = BatchDAG(input_dim, output_dim, num_intermediate, connections, activations)
 
         x = torch.tensor([[1, 2], [0, 3]], dtype=torch.float)
-        y = dag.forward(x, activation_functions)
+        y = dag._forward_with(x, activation_functions)
         target = torch.tensor([[-1, 3], [0, 3]], dtype=torch.float).view(2, 2, 1)
         self.assertAlmostEqual((y - target).abs().sum().item(), 0)
 
@@ -271,10 +277,10 @@ class TestDAG(unittest.TestCase):
         with self.assertRaises(ValueError):
             invalid_dag = DAG(input_dim, output_dim, num_intermediate, invalid_connections, activations, check_valid=True)
 
-    def test_forward(self):
+    def test__forward_with(self):
         x = torch.tensor([0, 1]).view(2, 1)
         activation_choices = [lambda x: x, lambda x: torch.ones_like(x)]
-        y = self.dag.forward(x, activation_choices)
+        y = self.dag._forward_with(x, activation_choices)
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
         self.assertAlmostEqual( (y - target).abs().sum().item(), 0)
 

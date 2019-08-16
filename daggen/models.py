@@ -40,7 +40,8 @@ class BatchDAG:
     """ Container for (a batch of) BatchDAGs that specify computations"""
 
     def __init__(self, input_dim, output_dim,
-                num_intermediate, connections, activations, check_shapes=True):
+                num_intermediate, connections, activations, 
+                activation_functions=None, check_shapes=True):
         """ `input_dim`: int, the dimensionality of the graph input.
             `output_dim`: int, the dimensionality of the graph output.
             `num_intermediate`: (N,) torch long tensor specifying the number of intermediate vertices of each
@@ -48,6 +49,7 @@ class BatchDAG:
             `connections`: (N, max_int + output_dim, max_int + input_dim) uint8 tensor specifying the adjacency
             matrix of each graph in the batch.
             `activations`: (N, max_int + output_dim) int tensor specifying which activation function to apply
+            `activation_functions`: if not None, list of shape-preserving functions on torch tensors. 
             at each active vertex. 
             `check_shapes`: Bool, default `True`: whether to check tensor shapes against num_intermediate. 
                 Set to `False` if constructing from a subset of the intermediate sizes used to build the `connections`, `activations` tensors.
@@ -63,7 +65,7 @@ class BatchDAG:
         self.num_intermediate = num_intermediate
         self.connections = connections
         self.activations = activations
-
+        self.activation_functions = activation_functions
         # largest number of intermediate vertices in the batch
         self.max_int = num_intermediate.max().item()
         # largest number of receiving vertices
@@ -92,7 +94,7 @@ class BatchDAG:
                         self.connections[i, ...], self.activations[i, ...],check_valid=False)
 
 
-    def forward(self, x, activation_choices):
+    def _forward_with(self, x, activation_choices):
         """ Compute forward passes for each of the networks on a single input.
             `x`: (M, input_dim) input tensor 
             `activation_choices`: list of candidate activation functions.
@@ -205,13 +207,13 @@ class DAG(BatchDAG):
     def __len__(self):
         raise TypeError
 
-    def forward(self, x, activation_choices):
+    def _forward_with(self, x, activation_choices):
         """ Compute forward through the dag
         `x`: (M, input_dim) input tensor 
         `activation_choices`: list of candidate activation functions.
         Returns: (M, output_dim), obtained by applying the ith network to the ith element of x.
         """
-        y = super().forward(x, activation_choices)
+        y = super()._forward_with(x, activation_choices)
         return y.view(x.size(0), self.output_dim)
 
     def to_graphviz(self, activation_labels):
@@ -698,5 +700,6 @@ class GraphGRU(ScalarGraphGRU):
             where networks has len `batch_size` and `log_probs` is (batch_size,) tensor of corresponding log-probabilities.
         """
         batchdag, log_probs = self.sample_dags_with_log_probs(batch_size, min_intermediate_vertices=min_intermediate_vertices, 
-                                                                            max_intermediate_vertices=max_intermediate_vertices)
-        networks = []
+                                                                             max_intermediate_vertices=max_intermediate_vertices)
+        return [dag for dag in batchdag], log_probs
+        
