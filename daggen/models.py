@@ -152,6 +152,15 @@ class BatchDAG:
         if is_singleton:
             outputs = outputs.view(self.batch_size, self.output_dim)
         return outputs
+
+    def forward(self, x):
+        """ Performs forward pass on the inputs x. Requires self.activation_functions to be set. 
+            `x`: (data_batch_size, input_size) tensor of inputs.
+            Returns: (data_batch_size, dag_batch_size,  output_size) tensor of outputs."""
+        if self.activation_functions is None:
+            raise ValueError("Activation functions must be set before forward() is called.")
+        return self._forward_with(x, self.activation_functions)
+
     
     def to_graphviz(self, activation_labels):
         """ Returns list of graphviz Digraphs, one for each graph in the batch.
@@ -208,13 +217,22 @@ class DAG(BatchDAG):
         raise TypeError
 
     def _forward_with(self, x, activation_choices):
-        """ Compute forward through the dag
+        """ Compute forward through the dag, using the activation functions provided
         `x`: (M, input_dim) input tensor 
         `activation_choices`: list of candidate activation functions.
-        Returns: (M, output_dim), obtained by applying the ith network to the ith element of x.
+        Returns: (M, output_dim), output tensor
         """
         y = super()._forward_with(x, activation_choices)
         return y.view(x.size(0), self.output_dim)
+
+    def forward(self, x):
+        """ Compute forward through the dag
+        `x`: (M, input_dim) input tensor 
+        Returns: (M, output_dim), output tensor.
+        """
+        y = super().forward(x)
+        return y.view(x.size(0), self.output_dim)
+
 
     def to_graphviz(self, activation_labels):
         """ Returns a graphviz Digraphs

@@ -214,7 +214,7 @@ class TestBatchDAG(unittest.TestCase):
         for d in dags:
             self.assertTrue(isinstance(d, DAG))
 
-    def test_forward_shape(self):
+    def test__forward_with_shape(self):
         """Check that forward pass produces outputs of expected shape."""
         activation_functions = [lambda x: x, lambda x: -x, torch.relu, torch.cos]
         x = torch.randn(self.input_dim)
@@ -244,6 +244,13 @@ class TestBatchDAG(unittest.TestCase):
         y = dag._forward_with(x, activation_functions)
         target = torch.tensor([[-1, 3], [0, 3]], dtype=torch.float).view(2, 2, 1)
         self.assertAlmostEqual((y - target).abs().sum().item(), 0)
+
+    def test_forward_shape(self):
+        activation_functions = [lambda x: x, lambda x: -x, torch.relu, torch.cos]
+        self.dag.activation_functions = activation_functions
+        x = torch.randn(self.input_dim)
+        y = self.dag.forward(x)
+        self.assertEqual(tuple(y.shape), (self.batch_size, self.output_dim))
 
     def test_build_graphviz(self):
         """ Check that digraphs build OK"""
@@ -283,6 +290,15 @@ class TestDAG(unittest.TestCase):
         y = self.dag._forward_with(x, activation_choices)
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
         self.assertAlmostEqual( (y - target).abs().sum().item(), 0)
+
+    def test_forward(self):
+        x = torch.tensor([0, 1]).view(2, 1)
+        activation_choices = [lambda x: x, lambda x: torch.ones_like(x)]
+        self.dag.activation_functions = activation_choices
+        y = self.dag.forward(x)
+        target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
+        self.assertAlmostEqual( (y - target).abs().sum().item(), 0)
+
 
     def test_to_graphviz(self):
         from graphviz import Digraph
