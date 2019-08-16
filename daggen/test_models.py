@@ -174,9 +174,11 @@ class TestGraphGRU(unittest.TestCase):
 
     def test_sample_networks_with_log_probs(self):
         batch_size = 5
+        self.graphgru.activation_functions = [lambda x : x, lambda x: -x, lambda x: x.cos(), lambda x: x.abs()]
         networks, log_probs = self.graphgru.sample_networks_with_log_probs(batch_size)
         self.assertEqual( len(networks), batch_size)
         self.assertEqual( tuple(log_probs.shape), (batch_size,))
+        self.assertTrue(networks[0].activation_functions[0] is self.graphgru.activation_functions[0])
 
 class TestBatchDAG(unittest.TestCase):
 

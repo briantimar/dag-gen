@@ -91,7 +91,8 @@ class BatchDAG:
     def __iter__(self):
         for i in range(self.batch_size):
             yield DAG(self.input_dim, self.output_dim, self.num_intermediate[i], 
-                        self.connections[i, ...], self.activations[i, ...],check_valid=False)
+                        self.connections[i, ...], self.activations[i, ...],
+                        activation_functions=self.activation_functions,check_valid=False)
 
 
     def _forward_with(self, x, activation_choices):
@@ -174,7 +175,8 @@ class DAG(BatchDAG):
     """ For convenience -- represents a single DAG, has no graph batch dimension. """
 
     def __init__(self,input_dim, output_dim,
-                num_intermediate, connections, activations, check_valid=False):
+                num_intermediate, connections, activations,
+                activation_functions = None, check_valid=False):
         """ `input_dim`: int, the dimensionality of the graph input.
             `output_dim`: int, the dimensionality of the graph output.
             `num_intermediate`: int specifying the number of intermediate vertices of each
@@ -183,6 +185,7 @@ class DAG(BatchDAG):
             matrix of each graph in the batch.
             `activations`: (max_int + output_dim) int tensor specifying which activation function to apply
             at each active vertex. 
+            `activation_functions`: if not None, list of candidate activation functions
             `check_valid`: Bool, default `False`: check whether connections is a valid adjacency matrix.
 
             Here `max_int` denotes the largest number of intermediate vertices within the graph batch.
@@ -211,7 +214,8 @@ class DAG(BatchDAG):
             if not is_valid_adjacency_matrix(connections[0, ...], num_intermediate[0], input_dim, output_dim):
                 raise ValueError("connections is not a valid adjacency matrix")
 
-        super().__init__(input_dim, output_dim, num_intermediate, connections, activations, check_shapes=False)
+        super().__init__(input_dim, output_dim, num_intermediate, connections, activations, 
+                        activation_functions=activation_functions, check_shapes=False)
 
     def __len__(self):
         raise TypeError
@@ -251,6 +255,7 @@ class DAGDistribution(torch.nn.Module):
     
     def __init__(self):
         super().__init__()
+        self.activation_functions = None
 
     def sample_dags_with_log_probs(self, batch_size, min_intermediate_vertices=None,
                                                     max_intermediate_vertices=None):
@@ -717,7 +722,10 @@ class GraphGRU(ScalarGraphGRU):
         returns: networks, log_probs
             where networks has len `batch_size` and `log_probs` is (batch_size,) tensor of corresponding log-probabilities.
         """
+        if self.activation_functions is None:
+            raise ValueError("Activation functions must be selected before sampling networks.")
         batchdag, log_probs = self.sample_dags_with_log_probs(batch_size, min_intermediate_vertices=min_intermediate_vertices, 
                                                                              max_intermediate_vertices=max_intermediate_vertices)
+        batchdag.activation_functions = self.activation_functions
         return [dag for dag in batchdag], log_probs
         
