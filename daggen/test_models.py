@@ -57,12 +57,17 @@ class TestScalarGraphGRU(unittest.TestCase):
         self.assertTrue('vertex_input_init' in param_names)
 
     def test__get_samples_and_log_probs(self):
-        l1 = torch.randn(10, 4)
-        
+        l1 = torch.randn(3, 4, requires_grad=True)
         s, lps = self.test_graph_gru._get_samples_and_log_probs(l1)
-        self.assertEqual(tuple(s.shape), (10,))
+        mask = torch.tensor([1, 0, 0], dtype=torch.uint8)
+        self.assertEqual(tuple(s.shape), (3,))
         self.assertTrue(max(s) < 4)
-        
+
+        s, lps = self.test_graph_gru._get_samples_and_log_probs(l1, mask_to_zero=mask)
+        self.assertEqual(s[0],0)
+        self.assertAlmostEqual(lps[0], 0.)
+        lps.sum().backward()
+
     def test__sample_graph_tensors_resolved_logprobs(self):
         batch_size=5
         max_vertices=4
@@ -129,6 +134,8 @@ class TestGraphGRU(unittest.TestCase):
         self.assertEqual(len(log_probs), len(activations))
         self.assertEqual(len(all_connections), len(activations))
 
+        
+
     def test_sample_graph_tensors(self):
         """ Check that sampled graph tensors have the correct shape"""
         batch_size=5
@@ -173,12 +180,16 @@ class TestGraphGRU(unittest.TestCase):
         self.assertEqual((num_intermediate - num_int).abs().sum(), 0)
 
     def test_sample_networks_with_log_probs(self):
-        batch_size = 5
+        """ Check that number of networks and logprobs is as expected, and that backprop into logprobs is possible."""
+        batch_size = 2
         self.graphgru.activation_functions = [lambda x : x, lambda x: -x, lambda x: x.cos(), lambda x: x.abs()]
         networks, log_probs = self.graphgru.sample_networks_with_log_probs(batch_size)
         self.assertEqual( len(networks), batch_size)
         self.assertEqual( tuple(log_probs.shape), (batch_size,))
         self.assertTrue(networks[0].activation_functions[0] is self.graphgru.activation_functions[0])
+        cost = log_probs.sum()
+        cost.backward()
+        
 
 class TestBatchDAG(unittest.TestCase):
 
