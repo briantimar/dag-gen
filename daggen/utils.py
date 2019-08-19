@@ -74,6 +74,7 @@ def do_score_training(dag_model, score_function,
                         total_samples, batch_size, optimizer, 
                             min_intermediate_vertices=None,
                             max_intermediate_vertices=None, 
+                            score_logger=None,
                             baseline='running_average'):
     """
     Run score-based "policy-gradient" training on the given DAG model.
@@ -86,6 +87,8 @@ def do_score_training(dag_model, score_function,
 
     `min_intermediate_vertices`: if not None, minimum number of vertices for each sampled graph
     `max_intermediate_vertices`: if not None, max number of vertices for each sampled graph
+
+    `score_logger`: if not None, callback to be called on each batch score value
 
     `baseline`: whether and how to subtract baseline from the score functions.
         choices: ("running_average", `None`)
@@ -131,5 +134,8 @@ def do_score_training(dag_model, score_function,
         batch_score = scores.mean().item()
         batch_scores.append(batch_score)
         running_avg_score = .9 * running_avg_score + .1 * batch_score
+
+        if score_logger is not None:
+            score_logger(batch_score)
 
     return batch_scores
