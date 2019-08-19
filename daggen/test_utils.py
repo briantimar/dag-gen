@@ -37,7 +37,7 @@ class TestDAGUtils(unittest.TestCase):
         dag = build_graphviz(input_dim, output_dim, num_intermediate, conns, activations, activation_labels)
         self.assertTrue(dag.directed)
 
-
+@unittest.skip
 class TestTrainingUtils(unittest.TestCase):
 
     def test_do_score_training(self):
