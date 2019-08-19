@@ -1,4 +1,5 @@
 import graphviz
+import torch
 
 def is_valid_adjacency_matrix(connections, num_intermediate, num_input, num_output):
     """ Check whether input defines a valid, left-justified adjacency matrix.
@@ -68,3 +69,67 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
                 edgelist.append((str(emitting_index), str(rec_index)))
     dag.edges(edgelist)
     return dag
+
+def do_score_training(dag_model, score_function, 
+                        total_samples, batch_size, optimizer, 
+                            min_intermediate_vertices=None,
+                            max_intermediate_vertices=None, 
+                            baseline='running_average'):
+    """
+    Run score-based "policy-gradient" training on the given DAG model.
+    `dag_model`: A generative model over DAGs which produces DAG objects and associated log-probability tensors
+        should implement `sample_networks_with_log_probs()`
+    `score_function`: a function which takes a `DAG` as input and returns a scalar (float) score.
+    `total_samples`: int, total number of samples to be drawn from DAG model during training.
+    `batch_size`: int, how many samples to use per update step
+    `optimizer`: a torch.optim optimizer for the DAG model parameters. 
+
+    `min_intermediate_vertices`: if not None, minimum number of vertices for each sampled graph
+    `max_intermediate_vertices`: if not None, max number of vertices for each sampled graph
+
+    `baseline`: whether and how to subtract baseline from the score functions.
+        choices: ("running_average", `None`)
+    Training attempts to maximize the expected score via gradient descent. """
+
+    if baseline not in ("running_average", None):
+        raise ValueError(f"Invalid baseline method {baseline}")
+    
+    from math import ceil
+    #total number of update steps
+    num_update = ceil(total_samples / batch_size)
+
+    def get_batch_size(update_index):
+        if update_index < num_update -1:
+            return batch_size
+        rem = total_samples % batch_size
+        if rem == 0:
+            return batch_size
+        return rem
+
+    running_avg_score = 0.
+
+    def cost_function(scores, log_probs):
+        if baseline == "running_average":
+            bl = running_avg_score
+        elif baseline is None:
+            bl = 0
+        return - ((scores - bl) * log_probs).sum()
+
+    batch_scores = []
+
+    for update_index in range(num_update):
+        # generate samples
+        _batch_size = get_batch_size(update_index)
+        dags, log_probs = dag_model.sample_networks_with_log_probs(_batch_size)
+        scores = torch.tensor(list(map(score_function, dags)))
+
+        cost = cost_function(scores, log_probs)
+        optimizer.zero_grad()
+        cost.backward()
+        optimizer.step()
+
+        batch_score = scores.mean().item()
+        batch_scores.append(batch_score)
+        running_avg_score = .9 * running_avg_score + .1 * batch_score
+
+    return batch_scores

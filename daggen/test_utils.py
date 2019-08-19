@@ -37,6 +37,32 @@ class TestDAGUtils(unittest.TestCase):
         dag = build_graphviz(input_dim, output_dim, num_intermediate, conns, activations, activation_labels)
         self.assertTrue(dag.directed)
 
+
+class TestTrainingUtils(unittest.TestCase):
+
+    def test_do_score_training(self):
+        """ Check that the mechanics of score training are ok"""
+        from .models import GraphGRU
+        from .utils import do_score_training
+        from torch.optim import SGD
+        
+        samples = 10
+        batch_size = 3
+        
+        input_dim = output_dim = num_activations = 1
+        hidden_size = logits_hidden_size = 1
+        dag_model = GraphGRU(input_dim, output_dim, hidden_size, logits_hidden_size, num_activations)
+        dag_model.activation_functions = [lambda x : x]
+        score = lambda d : 1.0
+        optimizer = SGD(dag_model.parameters(), lr=.1)
+
+        nets, log_probs = dag_model.sample_dags_with_log_probs(1)
+        batch_scores = do_score_training(dag_model, score, samples, batch_size, optimizer)
+
+        self.assertEqual(len(batch_scores), 4)
+
+
+
 if __name__ == "__main__":
     unittest.main()
 
