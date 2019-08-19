@@ -266,11 +266,11 @@ class TestDAG(unittest.TestCase):
         from .models import DAG
         self.input_dim = 1
         self.output_dim = 2
-        num_intermediate = 1
+        self.num_intermediate = 1
         connections = torch.tensor( [[1, 0], [ 1, 1 ], [1, 1]],dtype=torch.uint8)
         activations = torch.tensor([0, 0, 1], dtype=torch.long)
         
-        self.dag = DAG(self.input_dim, self.output_dim, num_intermediate, connections, activations, 
+        self.dag = DAG(self.input_dim, self.output_dim, self.num_intermediate, connections, activations, 
                                 activation_labels=('a', 'b'))
 
 
@@ -308,6 +308,12 @@ class TestDAG(unittest.TestCase):
         from graphviz import Digraph
         g = self.dag.to_graphviz()
         self.assertTrue(isinstance(g, Digraph))
+
+    def test_num_intermediate_scalar(self):
+        self.assertEqual(self.dag.get_num_intermediate(), self.num_intermediate)
+
+    def test_size(self):
+        self.assertEqual(self.dag.size, self.input_dim + self.output_dim + self.num_intermediate)
 
 if __name__ == "__main__":
     unittest.main()

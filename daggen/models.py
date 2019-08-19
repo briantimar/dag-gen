@@ -245,6 +245,14 @@ class DAG(BatchDAG):
         y = super().forward(x)
         return y.view(x.size(0), self.output_dim)
 
+    def get_num_intermediate(self):
+        """ Returns the number of intermediate vertices in the DAG (int) """
+        return self.num_intermediate.item()
+    
+    @property
+    def size(self):
+        """ Int, the total number of vertices in the DAG"""
+        return self.get_num_intermediate() + self.input_dim + self.output_dim
 
     def to_graphviz(self):
         """ Returns a graphviz Digraphs
