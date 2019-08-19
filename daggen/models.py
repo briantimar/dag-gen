@@ -519,8 +519,8 @@ class GraphGRU(ScalarGraphGRU):
                 `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each sampled graph.
                 `connections` maxnum+output_dim length list of byte tensor lists. Each inner list has length maxnum + input_dim.
                     connections[i][j] is a byte tensor indicating, for each graph in the batch, whether a connection j -> i exists.
-                `activations` maxnum+output_dim length list of integer tensors. Each specifies the activation applied at a particular vertex in each graph; entries are -1 if the vertex 
-                does not exist in that graph. The last output_dim entries always exist and correspond to the activations applied to the output neurons.
+                `activations` maxnum+output_dim length list of integer tensors. Each specifies the activation applied at a particular vertex in each graph; 
+                     The last output_dim entries always exist and correspond to the activations applied to the output neurons.
                 `log_probs`: maxnum + output_dim length list of log-probabilities.
         
         Vertices are ordered in the following manner:
@@ -682,7 +682,7 @@ class GraphGRU(ScalarGraphGRU):
                 `connections` (N, maxnum + output_dim, maxnum + input_dim) byte tensor. 
                     The i, j, k element is nonzero iff a connection k + input_dim -> j + output_dim exists in the ith graph.
                 `activations` (N, maxnum + output_dim) int tensor specifying an activation function to be applied at each intermediate vertex.
-                    Undefined entries (corresponding to vertices not present in sampled graphs) are filled with -1
+                    
                     Takes values in 0, ... num_activations -1
                 `log_probs`: (N,) float tensor of log-probabilities assigned to each graph in the batch
         
