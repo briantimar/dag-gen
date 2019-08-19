@@ -22,16 +22,16 @@ def model_config():
     num_activations = 1 
 
     min_intermediate_vertices = None
-    max_intermediate_vertices = 8
+    max_intermediate_vertices =20
 
 @learn_length.config
 def training_config():
     # desired number of intermediate vertices
-    target_num_intermediate = 4
+    target_num_intermediate = 5
     # how many graphs to sample per training step
     batch_size = 5
     # how many samples to draw from model
-    total_samples = 100
+    total_samples = 400
     #learning rate
     learning_rate = .01
 
