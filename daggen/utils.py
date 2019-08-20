@@ -72,8 +72,6 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
 
 def do_score_training(dag_model, score_function, 
                         total_samples, batch_size, optimizer, 
-                            min_intermediate_vertices=None,
-                            max_intermediate_vertices=None, 
                             score_logger=None,
                             network_callbacks=[],
                             log_every=1,
@@ -86,9 +84,6 @@ def do_score_training(dag_model, score_function,
     `total_samples`: int, total number of samples to be drawn from DAG model during training.
     `batch_size`: int, how many samples to use per update step
     `optimizer`: a torch.optim optimizer for the DAG model parameters. 
-
-    `min_intermediate_vertices`: if not None, minimum number of vertices for each sampled graph
-    `max_intermediate_vertices`: if not None, max number of vertices for each sampled graph
 
     `score_logger`: if not None, callback to be called on each batch score value
     `network_callbacks`: list of functions, each of which will be applied to the batch of
@@ -127,8 +122,7 @@ def do_score_training(dag_model, score_function,
     for update_index in range(num_update):
         # generate samples
         _batch_size = get_batch_size(update_index)
-        dags, log_probs = dag_model.sample_networks_with_log_probs(_batch_size, min_intermediate_vertices=min_intermediate_vertices, 
-                                                                                max_intermediate_vertices=max_intermediate_vertices)
+        dags, log_probs = dag_model.sample_networks_with_log_probs(_batch_size)
         scores = torch.tensor(list(map(score_function, dags)))
 
         cost = cost_function(scores, log_probs)
