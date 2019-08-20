@@ -127,7 +127,8 @@ def do_score_training(dag_model, score_function,
     for update_index in range(num_update):
         # generate samples
         _batch_size = get_batch_size(update_index)
-        dags, log_probs = dag_model.sample_networks_with_log_probs(_batch_size)
+        dags, log_probs = dag_model.sample_networks_with_log_probs(_batch_size, min_intermediate_vertices=min_intermediate_vertices, 
+                                                                                max_intermediate_vertices=max_intermediate_vertices)
         scores = torch.tensor(list(map(score_function, dags)))
 
         cost = cost_function(scores, log_probs)
