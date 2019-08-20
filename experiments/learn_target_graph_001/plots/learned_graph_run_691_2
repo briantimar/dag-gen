@@ -1,0 +1,7 @@
+digraph {
+	0 [label=inp0]
+	1 [label=inp1]
+	2 [label=id]
+	0 -> 2
+	1 -> 2
+}

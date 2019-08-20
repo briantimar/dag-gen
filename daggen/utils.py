@@ -56,7 +56,7 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
     for i in range(size):
         node=str(i)
         if i < input_dim:
-            label = ''
+            label = 'inp%d' % i
         else:
             label = activation_labels[activations[i-input_dim]]
         dag.node(node, label=label)
