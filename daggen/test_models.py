@@ -183,6 +183,7 @@ class TestGraphGRU(unittest.TestCase):
         """ Check that number of networks and logprobs is as expected, and that backprop into logprobs is possible."""
         batch_size = 2
         self.graphgru.activation_functions = [lambda x : x, lambda x: -x, lambda x: x.cos(), lambda x: x.abs()]
+        self.graphgru.activation_labels = ['a', 'b', 'c', 'd']
         networks, log_probs = self.graphgru.sample_networks_with_log_probs(batch_size)
         self.assertEqual( len(networks), batch_size)
         self.assertEqual( tuple(log_probs.shape), (batch_size,))
@@ -190,6 +191,7 @@ class TestGraphGRU(unittest.TestCase):
         cost = log_probs.sum()
         cost.backward()
         
+        self.assertEqual(networks[0].activation_labels, self.graphgru.activation_labels)
 
 class TestBatchDAG(unittest.TestCase):
 

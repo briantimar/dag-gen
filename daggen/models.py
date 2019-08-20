@@ -755,5 +755,7 @@ class GraphGRU(ScalarGraphGRU):
         batchdag, log_probs = self.sample_dags_with_log_probs(batch_size, min_intermediate_vertices=min_intermediate_vertices, 
                                                                              max_intermediate_vertices=max_intermediate_vertices)
         batchdag.activation_functions = self.activation_functions
+        if hasattr(self, 'activation_labels'):
+            batchdag.activation_labels = self.activation_labels
         return [dag for dag in batchdag], log_probs
         
