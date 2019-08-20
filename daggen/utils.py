@@ -59,6 +59,8 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
             label = 'inp%d' % i
         else:
             label = activation_labels[activations[i-input_dim]]
+            if i >= num_emitting:
+                label = f"out{i-num_emitting};{label}"
         dag.node(node, label=label)
     #add edges
     edgelist = []
