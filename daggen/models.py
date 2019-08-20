@@ -498,7 +498,10 @@ class GraphGRU(ScalarGraphGRU):
     """ Defines a distribution over graphs which may have arbitrary input / output dimensions."""
 
     def __init__(self, input_dim, output_dim,
-                    hidden_size, logits_hidden_size, num_activations ):
+                    hidden_size, logits_hidden_size, num_activations, 
+                    min_intermediate_vertices=None, 
+                    max_intermediate_vertices=None):
+                
         super().__init__(hidden_size, logits_hidden_size, num_activations)
         if input_dim < 1:
             raise ValueError("Invalid input dimension {0}").format(input_dim)
@@ -507,6 +510,9 @@ class GraphGRU(ScalarGraphGRU):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.num_io_vertices = input_dim + output_dim
+
+        self.min_intermediate_vertices = min_intermediate_vertices
+        self.max_intermediate_vertices = max_intermediate_vertices
 
     def _sample_graph_tensors_resolved(self, N, max_intermediate_vertices=None, min_intermediate_vertices=None): 
         """ Sample N graph encodings from the GraphGRU with log probs.
@@ -729,31 +735,25 @@ class GraphGRU(ScalarGraphGRU):
 
         return num_intermediate, activations, connections, log_probs
 
-    def sample_dags_with_log_probs(self, batch_size, min_intermediate_vertices=None,
-                                                    max_intermediate_vertices=None):
+    def sample_dags_with_log_probs(self, batch_size ):
         """ Sample a batch of `batch_size` BatchDAGs according to the GraphGRU's distribution.
-            `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
-            `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
       """
         num_intermediate, activations, connections, log_probs = self.sample_graph_tensors(batch_size, 
-                                                    max_intermediate_vertices=max_intermediate_vertices,
-                                                    min_intermediate_vertices=min_intermediate_vertices)
+                                                    max_intermediate_vertices=self.max_intermediate_vertices,
+                                                    min_intermediate_vertices=self.min_intermediate_vertices)
         batched_dag = BatchDAG(self.input_dim, self.output_dim, 
                             num_intermediate, connections, activations )
         return batched_dag, log_probs
 
-    def sample_networks_with_log_probs(self, batch_size, min_intermediate_vertices=None,
-                                                    max_intermediate_vertices=None):
+    def sample_networks_with_log_probs(self, batch_size):
         """ Sample a batch of `batch_size` networks according to the model distribution.
-            `max_intermediate_vertices`: if not None, the max number of non-IO vertices to permit in each graph.
-            `min_intermediate_vertices`: if not None, the min number of non-IO vertices to permit in each graph.
+        
         returns: networks, log_probs
             where networks has len `batch_size` and `log_probs` is (batch_size,) tensor of corresponding log-probabilities.
         """
         if self.activation_functions is None:
             raise ValueError("Activation functions must be selected before sampling networks.")
-        batchdag, log_probs = self.sample_dags_with_log_probs(batch_size, min_intermediate_vertices=min_intermediate_vertices, 
-                                                                             max_intermediate_vertices=max_intermediate_vertices)
+        batchdag, log_probs = self.sample_dags_with_log_probs(batch_size)
         batchdag.activation_functions = self.activation_functions
         if hasattr(self, 'activation_labels'):
             batchdag.activation_labels = self.activation_labels
