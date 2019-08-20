@@ -75,6 +75,8 @@ def do_score_training(dag_model, score_function,
                             min_intermediate_vertices=None,
                             max_intermediate_vertices=None, 
                             score_logger=None,
+                            network_callbacks=[],
+                            log_every=1,
                             baseline='running_average'):
     """
     Run score-based "policy-gradient" training on the given DAG model.
@@ -89,9 +91,11 @@ def do_score_training(dag_model, score_function,
     `max_intermediate_vertices`: if not None, max number of vertices for each sampled graph
 
     `score_logger`: if not None, callback to be called on each batch score value
-
+    `network_callbacks`: list of functions, each of which will be applied to the batch of
+    dags sampled from the network at each logging step.
     `baseline`: whether and how to subtract baseline from the score functions.
         choices: ("running_average", `None`)
+    `log_every`: Number of update steps between logging.
     Training attempts to maximize the expected score via gradient descent. """
 
     if baseline not in ("running_average", None):
@@ -135,7 +139,10 @@ def do_score_training(dag_model, score_function,
         batch_scores.append(batch_score)
         running_avg_score = .9 * running_avg_score + .1 * batch_score
 
-        if score_logger is not None:
-            score_logger(batch_score)
+        if update_index % log_every == 0:
+            if score_logger is not None:
+                score_logger(batch_score)
+            for callback in network_callbacks:
+                callback(dags)
 
     return batch_scores
