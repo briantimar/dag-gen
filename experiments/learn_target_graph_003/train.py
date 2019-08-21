@@ -14,7 +14,7 @@ expt.observers.append(MongoObserver.create())
 def model_config():
 
     #graph gru hidden size
-    hidden_size = 20
+    hidden_size = 64
     #graph input dimension
     input_dim = 3
     #graph output dimension
