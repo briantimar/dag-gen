@@ -106,3 +106,4 @@ venv.bak/
 
 _sandbox.py
 plots/
+.DS_Store

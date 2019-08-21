@@ -10,3 +10,6 @@ In the terminal:
 
 ## to do
 * Allow for scaling of edges during forward pass
+* Speed up the DAG forward pass
+    * First, benchmark it
+    * maybe do topological sort after graph construction? Then each layer can be updated in parallel. 
