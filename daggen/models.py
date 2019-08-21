@@ -670,7 +670,9 @@ class GraphGRU(ScalarGraphGRU):
 
             activations.append(activation)
             log_probs.append(lp_vertex)
-        
+
+            edge_hidden_state = act_state
+
         #return the lists of tensors which together define graphs
 
         return num_intermediate, all_connections, activations, log_probs
