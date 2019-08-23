@@ -1,4 +1,6 @@
 #!/bin/bash
 
+echo "Running model tests..."
 python -m daggen.test_models
+echo "Running utils tests..."
 python -m daggen.test_utils

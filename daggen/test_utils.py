@@ -37,6 +37,19 @@ class TestDAGUtils(unittest.TestCase):
         dag = build_graphviz(input_dim, output_dim, num_intermediate, conns, activations, activation_labels)
         self.assertTrue(dag.directed)
 
+class TestModelUtils(unittest.TestCase):
+
+    def test_get_activation(self):
+        from .utils import get_activation
+        f = get_activation('id')
+        x = torch.ones(4,4)
+        self.assertAlmostEqual((x - f(x)).abs().sum(), 0)
+        f = get_activation('inv')
+        self.assertAlmostEqual((x + f(x)).abs().sum(), 0)
+        f = get_activation('gauss')
+        self.assertAlmostEqual((f(x) - torch.tensor(-1.).exp() ).abs().sum(), 0)
+
+# skip becuase this involves actual training...
 @unittest.skip
 class TestTrainingUtils(unittest.TestCase):
 

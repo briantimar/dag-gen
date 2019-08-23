@@ -1,6 +1,23 @@
 import graphviz
 import torch
 
+_ACTIVATIONS = {'id': lambda x : x, 
+                    'inv': lambda x : -x, 
+                    'abs': lambda x : x.abs(), 
+                    'relu': lambda x : x.relu(), 
+                    'sin': lambda x : x.sin(), 
+                    'cos': lambda x : x.cos(), 
+                    'gauss': lambda x : (-x**2).exp(),
+                    'bias1': lambda x : torch.ones_like(x),
+                    }
+    
+
+def get_activation(name):
+    """Returns one of several standard activation functions."""
+    if name not in _ACTIVATIONS.keys():
+        raise ValueError(f"{name} is not a valid activation function.")
+    return _ACTIVATIONS[name]
+
 def is_valid_adjacency_matrix(connections, num_intermediate, num_input, num_output):
     """ Check whether input defines a valid, left-justified adjacency matrix.
     `connections`: (max_num_receiving, max_num_emitting) uint8 tensor
