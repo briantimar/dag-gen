@@ -103,6 +103,11 @@ class BatchDAG:
                         activation_functions=self.activation_functions,
                         activation_labels=self.activation_labels,check_valid=False)
 
+    def set_activation_functions(self, activation_labels):
+        """ Sets activation functions to those specified by list `activation_labels` (in that order) """
+        from .utils import get_activation
+        self.activation_labels = activation_labels
+        self.activation_functions = [get_activation(label) for label in activation_labels]
 
     def _forward_with(self, x, activation_choices):
         """ Compute forward passes for each of the networks on a single input.
@@ -244,6 +249,16 @@ class DAG(BatchDAG):
         """
         y = super().forward(x)
         return y.view(x.size(0), self.output_dim)
+
+    def sample_action_with_log_probs(self, state):
+        """This is implemented only for compatibility with my policy-gradient training code. 
+            Given input state (singleton or 1d tensor) return action in [0, ... output_dim) defined by 
+            sampling from the categorical distribution which uses DAG logits as final layer. """
+        logits = self.forward(state)
+        dist = Categorical(logits=logits)
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        return action, log_prob
 
     def get_num_intermediate(self):
         """ Returns the number of intermediate vertices in the DAG (int) """

@@ -305,7 +305,6 @@ class TestDAG(Test):
         self.dag = DAG(self.input_dim, self.output_dim, self.num_intermediate, connections, activations, 
                                 activation_labels=('a', 'b'))
 
-
     def test_build(self):
         from .models import DAG
         input_dim = 1
@@ -336,7 +335,6 @@ class TestDAG(Test):
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
         self.assertTensorAlmostEqual(y, target)
 
-
     def test_to_graphviz(self):
         from graphviz import Digraph
         g = self.dag.to_graphviz()
@@ -347,6 +345,22 @@ class TestDAG(Test):
 
     def test_size(self):
         self.assertEqual(self.dag.size, self.input_dim + self.output_dim + self.num_intermediate)
+
+    def test_set_activation_functions(self):
+        funcs= ['id', 'inv', 'bias1']
+        self.dag.set_activation_functions(funcs)
+        x = torch.rand(5)
+        self.assertTensorAlmostEqual(self.dag.activation_functions[0](x), x)
+        self.assertTensorAlmostEqual(self.dag.activation_functions[1](x), -x)
+        self.assertTensorAlmostEqual(self.dag.activation_functions[2](x), torch.ones_like(x))
+
+
+    def test_sample_action_with_log_prob(self):
+        pass
+        # inp = torch.rand(self.input_dim)
+  
+        # a, lp = self.dag.sample_action_with_log_probs(inp)
+        # self.assertEqual(a.shape, (1,))
 
 if __name__ == "__main__":
     unittest.main()
