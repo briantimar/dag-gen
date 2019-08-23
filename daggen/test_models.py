@@ -2,7 +2,16 @@ import unittest
 import torch
 import numpy as np
 
-class TestMLP(unittest.TestCase):
+def tensor_diff(x, y):
+    return (x - y).abs().sum()
+
+class Test(unittest.TestCase):
+    
+    def assertTensorAlmostEqual(self, x, y):
+        """Checks that two tensors are almost equal"""
+        self.assertAlmostEqual(tensor_diff(x, y), 0)
+
+class TestMLP(Test):
 
     def setUp(self):
         from .models import MLP
@@ -22,14 +31,14 @@ class TestMLP(unittest.TestCase):
         self.assertEqual(tuple(y1.shape), (13, 2))
         self.assertEqual(tuple(y2.shape), (13, 2))
 
-class TestTwoLayerMLP(unittest.TestCase):
+class TestTwoLayerMLP(Test):
 
     def test_sizes(self):
         from .models import TwoLayerMLP
         mlp = TwoLayerMLP(5, 4, 2)
         self.assertEqual(mlp.num_layers, 2)
 
-class TestScalarGraphGRU(unittest.TestCase):
+class TestScalarGraphGRU(Test):
 
     def setUp(self):
         from .models import ScalarGraphGRU
@@ -112,7 +121,7 @@ class TestScalarGraphGRU(unittest.TestCase):
         for tensor in (next_active_vertices, connections, activations):
             self.assertTrue(tensor.size(1) == min_vertices)
 
-class TestGraphGRU(unittest.TestCase):
+class TestGraphGRU(Test):
 
     def setUp(self):
         from .models import GraphGRU
@@ -177,7 +186,8 @@ class TestGraphGRU(unittest.TestCase):
         num_intermediate, activations, connections, log_probs = self.graphgru.sample_graph_tensors(batch_size, max_intermediate_vertices=num_int, 
                                                                                                     min_intermediate_vertices=num_int)
         self.assertEqual(tuple(activations.shape), (batch_size, num_int + self.num_output))
-        self.assertEqual((num_intermediate - num_int).abs().sum(), 0)
+        self.assertTensorAlmostEqual(num_intermediate, num_int)
+        
 
     def test_sample_networks_with_log_probs(self):
         """ Check that number of networks and logprobs is as expected, and that backprop into logprobs is possible."""
@@ -193,7 +203,16 @@ class TestGraphGRU(unittest.TestCase):
         
         self.assertEqual(networks[0].activation_labels, self.graphgru.activation_labels)
 
-class TestBatchDAG(unittest.TestCase):
+    def test_set_activation_functions(self):
+        funcs= ['id', 'inv', 'bias1']
+        self.graphgru.set_activation_functions(funcs)
+        x = torch.rand(5)
+        self.assertTensorAlmostEqual(self.graphgru.activation_functions[0](x), x)
+        self.assertTensorAlmostEqual(self.graphgru.activation_functions[1](x), -x)
+        self.assertTensorAlmostEqual(self.graphgru.activation_functions[2](x), torch.ones_like(x))
+
+
+class TestBatchDAG(Test):
 
     def setUp(self):
         from .models import GraphGRU
@@ -273,7 +292,7 @@ class TestBatchDAG(unittest.TestCase):
         digraphs = self.dag.to_graphviz()
         self.assertEqual(len(digraphs), self.batch_size)
 
-class TestDAG(unittest.TestCase):
+class TestDAG(Test):
 
     def setUp(self):
         from .models import DAG
@@ -306,7 +325,8 @@ class TestDAG(unittest.TestCase):
         activation_choices = [lambda x: x, lambda x: torch.ones_like(x)]
         y = self.dag._forward_with(x, activation_choices)
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
-        self.assertAlmostEqual( (y - target).abs().sum().item(), 0)
+        self.assertTensorAlmostEqual(y, target)
+        
 
     def test_forward(self):
         x = torch.tensor([0, 1]).view(2, 1)
@@ -314,7 +334,7 @@ class TestDAG(unittest.TestCase):
         self.dag.activation_functions = activation_choices
         y = self.dag.forward(x)
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
-        self.assertAlmostEqual( (y - target).abs().sum().item(), 0)
+        self.assertTensorAlmostEqual(y, target)
 
 
     def test_to_graphviz(self):

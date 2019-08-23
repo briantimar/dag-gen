@@ -514,6 +514,13 @@ class GraphGRU(ScalarGraphGRU):
         self.min_intermediate_vertices = min_intermediate_vertices
         self.max_intermediate_vertices = max_intermediate_vertices
 
+    def set_activation_functions(self, activation_labels):
+        """Sets activation functions according to the list of labels provided (which should match those expected by utils.get_activation)
+        """
+        from .utils import get_activation
+        self.activation_labels = activation_labels
+        self.activation_functions = [get_activation(f) for f in activation_labels]
+
     def _sample_graph_tensors_resolved(self, N, max_intermediate_vertices=None, min_intermediate_vertices=None): 
         """ Sample N graph encodings from the GraphGRU with log probs.
         
