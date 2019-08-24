@@ -240,6 +240,8 @@ class DAG(BatchDAG):
         Returns: (M, output_dim), output tensor
         """
         y = super()._forward_with(x, activation_choices)
+        if len(x.shape) == 1 :
+            return y.view(self.output_dim)
         return y.view(x.size(0), self.output_dim)
 
     def forward(self, x):
@@ -248,9 +250,9 @@ class DAG(BatchDAG):
         Returns: (M, output_dim), output tensor.
         """
         y = super().forward(x)
-        return y.view(x.size(0), self.output_dim)
+        return y
 
-    def sample_action_with_log_probs(self, state):
+    def sample_action_with_log_prob(self, state):
         """This is implemented only for compatibility with my policy-gradient training code. 
             Given input state (singleton or 1d tensor) return action in [0, ... output_dim) defined by 
             sampling from the categorical distribution which uses DAG logits as final layer. """

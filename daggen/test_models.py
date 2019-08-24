@@ -360,9 +360,9 @@ class TestDAG(Test):
         self.dag.set_activation_functions(['id', 'inv', 'bias1'])      
         inp = torch.rand(self.input_dim)
   
-        a, lp = self.dag.sample_action_with_log_probs(inp)
-        self.assertEqual(a.shape, (1,))
-        self.assertEqual(lp.shape, (1,))
+        a, lp = self.dag.sample_action_with_log_prob(inp)
+        self.assertEqual(a.shape, ())
+        self.assertEqual(lp.shape, ())
         self.assertTrue(a.item() < self.dag.output_dim)
 
 if __name__ == "__main__":
