@@ -808,7 +808,7 @@ class GraphGRU(ScalarGraphGRU):
             batchdag.activation_labels = self.activation_labels
         return [dag for dag in batchdag], log_probs
     
-    def _log_probs_from_graph_tensors(self, num_intermediate, connections, activations): 
+    def _log_probs_from_resolved_tensors(self, num_intermediate, connections, activations): 
         """ Compute log probabilities of the graph tensors provided. 
 
             `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each graph.
@@ -952,4 +952,22 @@ class GraphGRU(ScalarGraphGRU):
         #return the lists of tensors which together define graphs
 
         return sum(log_probs)
+
+    def log_prob(self, num_intermediate, connections_left_justified, activations_left_justified):
+        """Compute the log-probabilities of the graphs defined by the given connectivity and activation tensors.
+            N= batch size of the inputs.
+            num_intermediate: (N,) long tensor specifying the number of intermediate vertices in each graph.
+            connections: (N, num_receiving, num_emitting) byte tensor
+                i, j, k is nonzero iff k --> input_dim + j in graph i
+            activations: (N, num_receiving) long tensor specifying activation values.
+            where num_receiving = max(num_intermediate) + output_dim
+                num_emitting = max(num_intermediate) + input_dim
+            Returns: (N,) tensor of log-probabilities
+
+            TODO don't call the resolved version, there's no need.
+            """
+        from .utils import to_resolved_tensors
+        connections_resolved, activations_resolved = to_resolved_tensors(num_intermediate, connections_left_justified, activations_left_justified, 
+                                                                        self.input_dim, self.output_dim)
+        return self._log_probs_from_resolved_tensors(num_intermediate, connections_resolved, activations_resolved)
 

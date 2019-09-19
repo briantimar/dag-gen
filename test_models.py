@@ -220,7 +220,7 @@ class TestGraphGRU(Test):
         self.assertTensorAlmostEqual(self.graphgru.activation_functions[2](x), torch.ones_like(x))
 
    
-    def test__log_probs_from_graph_tensors(self):
+    def test__log_probs_from_resolved_tensors(self):
         num_intermediate = torch.tensor([1], dtype=torch.long)
         conn2 = torch.tensor([[1,1]],dtype=torch.long)
         conn3 = torch.tensor([[0,0,1]],dtype=torch.long)
@@ -230,9 +230,19 @@ class TestGraphGRU(Test):
 
         activations = [torch.tensor([0]), torch.tensor([0]), torch.tensor([2]), torch.tensor([1])]
 
-        lps = self.graphgru._log_probs_from_graph_tensors(num_intermediate, connections,activations)
+        lps = self.graphgru._log_probs_from_resolved_tensors(num_intermediate, connections,activations)
+        self.assertEqual(len(lps), 1)
 
-
+    def test_log_prob(self):
+        activations = torch.tensor([[1, 1, 1, -1], 
+                                    [1, 1, 1, 1]])
+        num_intermediate = torch.tensor([0,1])
+        connections = torch.zeros(2, 4, 3)
+        connections[0, :, 0] = 1
+        connections[1, 0, :2] = 1
+        connections[1, 1:, 2] = 1
+        lps = self.graphgru.log_prob(num_intermediate, connections, activations)
+        self.assertEqual(len(lps), 2)
 
 
 
