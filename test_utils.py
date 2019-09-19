@@ -70,8 +70,7 @@ class TestModelUtils(Test):
         lengths = [1, 2]
         b = right_justify(a, lengths, output_dim)
         self.assertTensorAlmostEqual(target, b)
-        
-    @unittest.skip
+
     def test_to_resolved_tensors(self):
         from daggen.utils import to_resolved_tensors
         batch_size = 2
@@ -97,6 +96,7 @@ class TestModelUtils(Test):
 
         self.assertTensorAlmostEqual(conns_resolved[0], torch.tensor([[1], [1]], dtype=torch.uint8))
         self.assertTensorAlmostEqual(conns_resolved[1], torch.tensor([[0,0], [0,1]], dtype=torch.uint8))
+        self.assertTensorAlmostEqual(conns_resolved[2], torch.tensor([[0,1,0], [0,0,1]], dtype=torch.uint8))
 
 # skip becuase this involves actual training...
 @unittest.skip

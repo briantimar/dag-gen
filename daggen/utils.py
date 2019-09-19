@@ -19,15 +19,15 @@ def get_activation(name):
     return _ACTIVATIONS[name]
 
 def right_justify(arr, lengths, output_dim):
-    """ Return a right-justified version of the given array (not idempotent).
-    arr: (N, ..., k) tensor
+    """ Return a right-justified version of the given array along dim 1.
+    arr: (N, k, ...) tensor
     lengths: (N,) list of integers, which specify how much of each row of arr is to be shifted
     In each row, elements lengths[i]: lengths[i] + output_dim are slid all the way to the right.
     """
     justified = torch.zeros_like(arr)
     for i in range(arr.shape[0]):
-        justified[i, ..., -(output_dim):] = arr[i, ..., lengths[i]:lengths[i] + output_dim]
-        justified[i, ..., :lengths[i]] = arr[i, ..., :lengths[i]]
+        justified[i, -(output_dim):, ...] = arr[i, lengths[i]:lengths[i] + output_dim, ...]
+        justified[i, :lengths[i], ...] = arr[i, :lengths[i], ...]
     return justified
 
 
@@ -43,11 +43,11 @@ def to_resolved_tensors( num_intermediate, connections_left_justified, activatio
 
         """
     from .utils import right_justify
-    num_rec = connections.size(1)
-    num_emit = connections.size(2)
+    num_rec = connections_left_justified.size(1)
+    num_emit = connections_left_justified.size(2)
     
-    activations = right_justify(activations_left_justified, num_intermediate + output_dim)
-    connections = right_justify(connections_left_justified, num_intermediate + output_dim)
+    activations = right_justify(activations_left_justified, num_intermediate, output_dim)
+    connections = right_justify(connections_left_justified, num_intermediate, output_dim)
 
     conns_resolved = []
     activations_resolved = []
