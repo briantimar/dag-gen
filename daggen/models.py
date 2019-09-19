@@ -383,16 +383,22 @@ class ScalarGraphGRU(GraphRNN):
             lps[mask_to_zero] = 0
         return samples, lps
 
-    def _get_log_probs(self, logits, samples):
+    def _get_log_probs(self, logits, samples, mask_to_zero=None):
         """Compute the log-probability of the samples under a categorical distribution with
         the given logits.
         logits: a (batch_size, output_dim) float Tensor
         samples: (batch_size,) long Tensor with elements taking values in [0, output_dim)
-
+         `mask_to_zero`: if not `None`, (batch_size,) uint8 tensor: elements of `samples` indicated by the mask will be set to zero prior
+                 to log-probability computation; elements of log_probs will then be zeroed as well.
         Returns: (batch_size) float tensor holding the log-probabilities.
         """
+        if mask_to_zero is not None:
+            samples[mask_to_zero] = 0
         dist = Categorical(logits=logits)
-        return dist.log_prob(samples)
+        lps = dist.log_prob(samples)
+        if mask_to_zero is not None:
+            lps[mask_to_zero] = 0
+        return lps
 
     def _sample_graph_tensors_resolved_logprobs(self, N, max_vertices=None, min_vertices=None ):
         """ Sample N graph encodings from the ScalarGraphGRU, with log probs resolved by vertex.
@@ -846,13 +852,15 @@ class GraphGRU(ScalarGraphGRU):
             lp_vertex = self._get_log_probs(vertex_logits, add_vertex)
             
             active_graphs = active_graphs & (add_vertex > 0)
+
+            # print(f"active graphs: {active_graphs}")
+            # print(f"add_vertex: {add_vertex}")
+            
             #ignore graphs which have already finished sampling
             mask_to_zero = ~active_graphs
-            num_intermediate += active_graphs.to(dtype=torch.long)
-
-            ##sampling halts when all graph sequences have terminated, or max number of vertices is reached
-            graph_complete = min_vertices_satisfied and ( active_graphs.sum().item()==0 or max_vertices_satisfied)
-
+        
+            ##intermediate eval halts when no graphs are active
+            graph_complete = ( active_graphs.sum().item()==0 )
 
             if not graph_complete:
                 #now pass hidden state down to edge cells
@@ -860,15 +868,16 @@ class GraphGRU(ScalarGraphGRU):
                 edge_input_init = torch.zeros(N,1)
                 edge_input = edge_input_init
 
-                #determine whether to connect to each previous vertex
-                vertex_connections = []
+                #connections made at this vertex for each graph
+                vertex_connections = connections[vertex_index-self.input_dim]
                 for prev_index in range(vertex_index):
                     #compute edge hidden state
                     edge_hidden_state = self.edge_cell(edge_input, edge_hidden_state)            
-                    #sample connectivity to prev_index
+                    
+                    #likelihood of connection to prev_index
                     connection_logits = self.edge_logits(edge_hidden_state)
 
-                    add_connection, lp_connection = self._get_samples_and_log_probs(connection_logits, mask_to_zero=mask_to_zero)
+                    lp_connection = self._get_log_probs(connection_logits, mask_to_zero=mask_to_zero)
                                         
                     lp_vertex = lp_vertex + lp_connection
                     vertex_connections.append(add_connection)
