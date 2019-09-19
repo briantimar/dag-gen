@@ -18,17 +18,45 @@ def get_activation(name):
         raise ValueError(f"{name} is not a valid activation function.")
     return _ACTIVATIONS[name]
 
-def right_justify(arr, lengths, offset=0):
+def right_justify(arr, lengths, output_dim):
     """ Return a right-justified version of the given array (not idempotent).
-    arr: (N, k) tensor
+    arr: (N, ..., k) tensor
     lengths: (N,) list of integers, which specify how much of each row of arr is to be shifted
-    offset: int, specifying where the offset starts
+    In each row, elements lengths[i]: lengths[i] + output_dim are slid all the way to the right.
     """
     justified = torch.zeros_like(arr)
     for i in range(arr.shape[0]):
-        justified[i, -lengths[i]:] = arr[i, offset:offset+lengths[i]]
-        justified[i, :offset] = arr[i, :offset]
+        justified[i, ..., -(output_dim):] = arr[i, ..., lengths[i]:lengths[i] + output_dim]
+        justified[i, ..., :lengths[i]] = arr[i, ..., :lengths[i]]
     return justified
+
+
+def to_resolved_tensors( num_intermediate, connections_left_justified, activations_left_justified, input_dim, output_dim):
+    """Convert the given monolithic torch tensors defining a batch of graphs to lists of resolved tensors 
+        num_intermediate: (N,) long tensor specifying the number of intermediate vertices in each graph.
+        connections_left_justified: (N, num_receiving, num_emitting) byte tensor
+            i, j, k is nonzero iff k --> input_dim + j in graph i
+        activations_left_justified: (N, num_receiving) long tensor specifying activation values.
+        where num_receiving = max(num_intermediate) + output_dim
+            num_emitting = max(num_intermediate) + input_dim
+        Returns: num_intermediate, connections_resolved, activations_resolved.
+
+        """
+    from .utils import right_justify
+    num_rec = connections.size(1)
+    num_emit = connections.size(2)
+    
+    activations = right_justify(activations_left_justified, num_intermediate + output_dim)
+    connections = right_justify(connections_left_justified, num_intermediate + output_dim)
+
+    conns_resolved = []
+    activations_resolved = []
+    for i in range(num_rec):
+        numinputs = min(input_dim + i, num_emit)
+        conns_resolved.append(connections[:, i, :numinputs])
+        activations_resolved.append(activations[:, i])
+
+    return conns_resolved, activations_resolved
 
 def is_valid_adjacency_matrix(connections, num_intermediate, num_input, num_output):
     """ Check whether input defines a valid, left-justified adjacency matrix.

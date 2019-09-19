@@ -62,16 +62,41 @@ class TestModelUtils(Test):
 
     def test_right_justify(self):
         from daggen.utils import right_justify
-        a = torch.tensor([[0, 1, 2, -1, -1],
+        a = torch.tensor([[1, 1, 2, -1, -1],
                           [5, 6,7, 8, -1]])
-        target = torch.tensor([[0, 1, 0, 0, 2],
+        target = torch.tensor([[1, 0, 0, 1, 2],
                                  [5, 6, 0, 7,8]])
-        offset =2
+        output_dim =2
         lengths = [1, 2]
-        b = right_justify(a, lengths, offset=offset)
+        b = right_justify(a, lengths, output_dim)
         self.assertTensorAlmostEqual(target, b)
+        
+    @unittest.skip
+    def test_to_resolved_tensors(self):
+        from daggen.utils import to_resolved_tensors
+        batch_size = 2
+        num_in = 1
+        num_out = 1
+        num_intemediate = torch.tensor([1, 2])
+        max_int = num_intemediate.max().item()
+        connections = torch.zeros(batch_size, max_int + num_out, max_int + num_in, dtype=torch.uint8)
+        connections[0, 0, 0] = 1
+        connections[0, 1, 1] = 1
+        connections[1, 0, 0] = 1
+        connections[1, 1, 1] = 1
+        connections[1, 2, 2] = 1
+        activations =torch.tensor([[0, 1, -1], [1, 1, 2]])
 
+        conns_resolved, activations_resolved = to_resolved_tensors(num_intemediate, connections, activations,
+                                                                        num_in, num_out)
+        self.assertEqual(len(conns_resolved), max_int + num_out)
+        self.assertEqual(len(activations_resolved), max_int + num_out)
+        self.assertTensorAlmostEqual(activations_resolved[0], torch.tensor([0, 1]))
+        self.assertTensorAlmostEqual(activations_resolved[1], torch.tensor([0, 1]))
+        self.assertTensorAlmostEqual(activations_resolved[2], torch.tensor([1, 2]))
 
+        self.assertTensorAlmostEqual(conns_resolved[0], torch.tensor([[1], [1]], dtype=torch.uint8))
+        self.assertTensorAlmostEqual(conns_resolved[1], torch.tensor([[0,0], [0,1]], dtype=torch.uint8))
 
 # skip becuase this involves actual training...
 @unittest.skip
