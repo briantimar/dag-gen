@@ -3,7 +3,7 @@ import torch
 import numpy as np
 
 def tensor_diff(x, y):
-    return (x - y).abs().sum()
+    return (x - y).abs().sum().item()
 
 class Test(unittest.TestCase):
     
@@ -76,6 +76,13 @@ class TestScalarGraphGRU(Test):
         self.assertEqual(s[0],0)
         self.assertAlmostEqual(lps[0], 0.)
         lps.sum().backward()
+
+    def test__get_log_probs(self):
+        logits = torch.zeros(3, 4)
+        samples = torch.tensor([0, 2, 1]).to(dtype=torch.long)
+        lps = self.test_graph_gru._get_log_probs(logits, samples)
+        self.assertEqual(tuple(lps.shape), (3,))
+        self.assertTensorAlmostEqual(lps.exp(), torch.ones(3)/4.0)
 
     def test__sample_graph_tensors_resolved_logprobs(self):
         batch_size=5

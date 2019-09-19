@@ -383,6 +383,17 @@ class ScalarGraphGRU(GraphRNN):
             lps[mask_to_zero] = 0
         return samples, lps
 
+    def _get_log_probs(self, logits, samples):
+        """Compute the log-probability of the samples under a categorical distribution with
+        the given logits.
+        logits: a (batch_size, output_dim) float Tensor
+        samples: (batch_size,) long Tensor with elements taking values in [0, output_dim)
+
+        Returns: (batch_size) float tensor holding the log-probabilities.
+        """
+        dist = Categorical(logits=logits)
+        return dist.log_prob(samples)
+
     def _sample_graph_tensors_resolved_logprobs(self, N, max_vertices=None, min_vertices=None ):
         """ Sample N graph encodings from the ScalarGraphGRU, with log probs resolved by vertex.
         
@@ -784,4 +795,154 @@ class GraphGRU(ScalarGraphGRU):
         if hasattr(self, 'activation_labels'):
             batchdag.activation_labels = self.activation_labels
         return [dag for dag in batchdag], log_probs
+    
+    def _log_prob_from_graph_tensors(self, num_intermediate, connections, activations): 
+        """ Compute log probabilities of the graph tensors provided. 
+
+            `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each graph.
+            `connections` maxnum+output_dim length list of byte tensor lists. Each inner list has length maxnum + input_dim.
+                connections[i][j] is an (N,) byte tensor indicating, for each graph in the batch, whether a connection j -> i exists.
+            `activations` maxnum+output_dim length list of (N,) integer tensors. Each specifies the activation applied at a particular vertex in each graph; 
+                    The last output_dim entries always exist and correspond to the activations applied to the output neurons.
+            `log_probs`: maxnum + output_dim length list of log-probabilities.
+
+        Vertices are ordered in the following manner:
+            the first input_dim are the input vertices
+            the last output_dim are the output vertices
+            All vertices in between, if any, are the intermediate vertices.
+            """
+
+        #index of the current vertex
+        # start sampling after the input vertices
+        vertex_index = self.input_dim
+
+        # batch size
+        N = num_intermediate.size(0)
+
+        graph_complete = False
+        #initialize the hidden state
+        vertex_hidden_state = self.hidden_init.view(1, -1).expand(N, self.hidden_size)
+        vertex_input = self.vertex_input_init.view(1, -1).expand(N, self.vertex_input_size)
+
+        #holds log probabilities for the batch
+        log_probs = []
+
+        #keep track of which graphs are still being evaluated
+        active_graphs = torch.ones(N,dtype=torch.uint8)
         
+        while not graph_complete:
+            #compute new hidden state
+            vertex_hidden_state = self.vertex_cell(vertex_input, vertex_hidden_state)
+            #check whether another vertex should be added
+            vertex_logits = self.vertex_logits(vertex_hidden_state)
+        
+            add_vertex, lp_vertex = self._get_samples_and_log_probs(vertex_logits)
+            
+            #a graph is active only if it has added a vertex at each sampling step.
+            if min_intermediate_vertices is not None and (vertex_index+1 - self.input_dim) <= min_intermediate_vertices:
+                add_vertex = torch.ones(N, dtype=torch.long)
+                lp_vertex = torch.zeros(N, requires_grad=True)
+                min_vertices_satisfied = False
+            else:
+                min_vertices_satisfied = True
+
+            if max_intermediate_vertices is not None and (vertex_index+1 - self.input_dim) > max_intermediate_vertices:
+                add_vertex = torch.zeros(N, dtype=torch.long)
+                lp_vertex = torch.zeros(N, requires_grad=True)
+                max_vertices_satisfied = True
+            else:
+                max_vertices_satisfied = False
+
+            active_graphs = active_graphs & (add_vertex > 0)
+            #ignore graphs which have already finished sampling
+            mask_to_zero = ~active_graphs
+            num_intermediate += active_graphs.to(dtype=torch.long)
+
+            ##sampling halts when all graph sequences have terminated, or max number of vertices is reached
+            graph_complete = min_vertices_satisfied and ( active_graphs.sum().item()==0 or max_vertices_satisfied)
+
+
+            if not graph_complete:
+                #now pass hidden state down to edge cells
+                edge_hidden_state = vertex_hidden_state
+                edge_input_init = torch.zeros(N,1)
+                edge_input = edge_input_init
+
+                #determine whether to connect to each previous vertex
+                vertex_connections = []
+                for prev_index in range(vertex_index):
+                    #compute edge hidden state
+                    edge_hidden_state = self.edge_cell(edge_input, edge_hidden_state)            
+                    #sample connectivity to prev_index
+                    connection_logits = self.edge_logits(edge_hidden_state)
+
+                    add_connection, lp_connection = self._get_samples_and_log_probs(connection_logits, mask_to_zero=mask_to_zero)
+                                        
+                    lp_vertex = lp_vertex + lp_connection
+                    vertex_connections.append(add_connection)
+
+                    edge_input = add_connection.view(N, 1).to(dtype=torch.float)
+
+                all_connections.append(torch.stack(vertex_connections, dim=1))
+                # finally, determine which activation function to apply to this vertex
+                act_state = self.activation_cell(edge_input, edge_hidden_state)
+                act_logits = self.activation_logits(act_state)
+
+                activation, lp_act = self._get_samples_and_log_probs(act_logits, mask_to_zero=mask_to_zero)
+                lp_vertex = lp_vertex + lp_act
+
+                activations.append(activation)
+                #record the conditional log-probability for everything sampled at this vertex
+                log_probs.append(lp_vertex)
+
+                #compute input to the next vertex cell
+                vertex_input = torch.cat((edge_hidden_state, activation.view(-1, 1).to(dtype=torch.float)), dim=1)
+                
+                vertex_index += 1
+
+        #at this point, there are no more intermediate vertices to sample
+        #however, the connections to the output vertices still have to be defined
+        maxnum = vertex_index - self.input_dim
+        max_graph_size = maxnum + self.input_dim + self.output_dim
+        # the outputs are treated as vertices which exist with probability 1, but can't connect to each other.
+        # NOTE activations are applied to the output vertices!
+        if num_intermediate.sum().item()==0:
+            edge_hidden_state = vertex_hidden_state
+        for vertex_index in range(vertex_index, max_graph_size):
+            edge_input_init = torch.zeros(N,1)
+            edge_input = edge_input_init
+            lp_vertex = torch.zeros(N)
+
+            vertex_connections = []
+
+            for prev_index in range(maxnum + self.input_dim):
+                #compute edge hidden state
+                edge_hidden_state = self.edge_cell(edge_input, edge_hidden_state)            
+                #sample connectivity to prev_index
+                connection_logits = self.edge_logits(edge_hidden_state)
+                # for each graph, only look at prev connections which are actually possible for that graph.
+                vertex_exists = (num_intermediate + self.input_dim) > prev_index
+                mask_to_zero = ~vertex_exists
+                add_connection, lp_connection = self._get_samples_and_log_probs(connection_logits, mask_to_zero=mask_to_zero)
+
+                lp_vertex[vertex_exists] = lp_connection[vertex_exists] + lp_connection[vertex_exists]
+                vertex_connections.append(add_connection)
+
+                edge_input = add_connection.view(N, 1).to(dtype=torch.float)
+            
+            all_connections.append(torch.stack(vertex_connections, dim=1))
+            
+            act_state = self.activation_cell(edge_input, edge_hidden_state)
+            act_logits = self.activation_logits(act_state)
+            activation, lp_act = self._get_samples_and_log_probs(act_logits)
+            lp_vertex = lp_vertex + lp_act
+
+            activations.append(activation)
+            log_probs.append(lp_vertex)
+
+            edge_hidden_state = act_state
+
+        #return the lists of tensors which together define graphs
+
+        return num_intermediate, all_connections, activations, log_probs
+
