@@ -852,9 +852,6 @@ class GraphGRU(ScalarGraphGRU):
             lp_vertex = self._get_log_probs(vertex_logits, add_vertex)
             
             active_graphs = active_graphs & (add_vertex > 0)
-
-            # print(f"active graphs: {active_graphs}")
-            # print(f"add_vertex: {add_vertex}")
             
             #ignore graphs which have already finished sampling
             mask_to_zero = ~active_graphs
@@ -876,23 +873,21 @@ class GraphGRU(ScalarGraphGRU):
                     
                     #likelihood of connection to prev_index
                     connection_logits = self.edge_logits(edge_hidden_state)
-
-                    lp_connection = self._get_log_probs(connection_logits, mask_to_zero=mask_to_zero)
+                    prev_conn = vertex_connections[:, prev_index]
+                    lp_connection = self._get_log_probs(connection_logits, prev_conn, mask_to_zero=mask_to_zero)
                                         
                     lp_vertex = lp_vertex + lp_connection
-                    vertex_connections.append(add_connection)
+                    
+                    edge_input = prev_conn.view(N, 1).to(dtype=torch.float)
 
-                    edge_input = add_connection.view(N, 1).to(dtype=torch.float)
-
-                all_connections.append(torch.stack(vertex_connections, dim=1))
-                # finally, determine which activation function to apply to this vertex
+                # now compute the log-probability of activation
+                activation = activations[vertex_index - self.input_dim]
                 act_state = self.activation_cell(edge_input, edge_hidden_state)
                 act_logits = self.activation_logits(act_state)
 
-                activation, lp_act = self._get_samples_and_log_probs(act_logits, mask_to_zero=mask_to_zero)
+                lp_act = self._get_log_probs(act_logits, activation, mask_to_zero=mask_to_zero)
                 lp_vertex = lp_vertex + lp_act
 
-                activations.append(activation)
                 #record the conditional log-probability for everything sampled at this vertex
                 log_probs.append(lp_vertex)
 
@@ -900,6 +895,11 @@ class GraphGRU(ScalarGraphGRU):
                 vertex_input = torch.cat((edge_hidden_state, activation.view(-1, 1).to(dtype=torch.float)), dim=1)
                 
                 vertex_index += 1
+
+            else:
+                #record log-prob corresponding to the 'stop' token
+                log_probs.append(lp_vertex)
+            
 
         #at this point, there are no more intermediate vertices to sample
         #however, the connections to the output vertices still have to be defined
@@ -914,36 +914,38 @@ class GraphGRU(ScalarGraphGRU):
             edge_input = edge_input_init
             lp_vertex = torch.zeros(N)
 
-            vertex_connections = []
+            vertex_connections = connections[vertex_index - self.input_dim]
 
             for prev_index in range(maxnum + self.input_dim):
                 #compute edge hidden state
                 edge_hidden_state = self.edge_cell(edge_input, edge_hidden_state)            
                 #sample connectivity to prev_index
                 connection_logits = self.edge_logits(edge_hidden_state)
-                # for each graph, only look at prev connections which are actually possible for that graph.
+                                
+                prev_conn = vertex_connections[:, prev_index]
+                # check that the requested connections are actually possible
                 vertex_exists = (num_intermediate + self.input_dim) > prev_index
                 mask_to_zero = ~vertex_exists
-                add_connection, lp_connection = self._get_samples_and_log_probs(connection_logits, mask_to_zero=mask_to_zero)
+                if (prev_conn[mask_to_zero]>0).any():
+                    raise ValueError("Graph tensors are invalid!")
+
+                lp_connection = self._get_log_probs(connection_logits, prev_conn, mask_to_zero=mask_to_zero)
 
                 lp_vertex[vertex_exists] = lp_connection[vertex_exists] + lp_connection[vertex_exists]
-                vertex_connections.append(add_connection)
-
-                edge_input = add_connection.view(N, 1).to(dtype=torch.float)
+                edge_input = prev_conn.view(N, 1).to(dtype=torch.float)
             
-            all_connections.append(torch.stack(vertex_connections, dim=1))
             
             act_state = self.activation_cell(edge_input, edge_hidden_state)
             act_logits = self.activation_logits(act_state)
-            activation, lp_act = self._get_samples_and_log_probs(act_logits)
+            activation = activations[vertex_index - self.input_dim]
+            lp_act = self._get_log_probs(act_logits, activation)
             lp_vertex = lp_vertex + lp_act
 
-            activations.append(activation)
             log_probs.append(lp_vertex)
 
             edge_hidden_state = act_state
 
         #return the lists of tensors which together define graphs
 
-        return num_intermediate, all_connections, activations, log_probs
+        return sum(log_probs)
 
