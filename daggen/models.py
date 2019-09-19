@@ -802,8 +802,10 @@ class GraphGRU(ScalarGraphGRU):
         """ Compute log probabilities of the graph tensors provided. 
 
             `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each graph.
-            `connections` maxnum+output_dim length list of byte tensor lists. Each inner list has length maxnum + input_dim.
-                connections[i][j] is an (N,) byte tensor indicating, for each graph in the batch, whether a connection j -> i exists.
+            `connections` maxnum+output_dim length of byte tensors. 
+                    The ith tensor has shape (N, num_prev_emitting), where num_prev_emitting is the number of emitting vertices
+                    that come before receiving vertex i in the graph. 
+                    connections[i][:,j] is a byte tensor indicating, for each graph in the batch, whether a connection j -> i exists.
             `activations` maxnum+output_dim length list of (N,) integer tensors. Each specifies the activation applied at a particular vertex in each graph; 
                     The last output_dim entries always exist and correspond to the activations applied to the output neurons.
             `log_probs`: maxnum + output_dim length list of log-probabilities.
