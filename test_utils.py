@@ -5,7 +5,7 @@ class TestDAGUtils(unittest.TestCase):
 
     def test_is_valid_adjacency_matrix(self):
         """ Check whether adjacency tensors are correctly identified."""
-        from .utils import is_valid_adjacency_matrix
+        from daggen.utils import is_valid_adjacency_matrix
         input_dim = 2
         output_dim = 1
         num_intermediate = 1
@@ -26,7 +26,7 @@ class TestDAGUtils(unittest.TestCase):
 
     def test_build_graphviz(self):
         """ Check graphviz constructor."""
-        from .utils import build_graphviz
+        from daggen.utils import build_graphviz
         input_dim = 2
         output_dim = 1
         num_intermediate = 1
@@ -40,7 +40,7 @@ class TestDAGUtils(unittest.TestCase):
 class TestModelUtils(unittest.TestCase):
 
     def test_get_activation(self):
-        from .utils import get_activation
+        from daggen.utils import get_activation
         f = get_activation('id')
         x = torch.ones(4,4)
         self.assertAlmostEqual((x - f(x)).abs().sum(), 0)
@@ -55,8 +55,8 @@ class TestTrainingUtils(unittest.TestCase):
 
     def test_do_score_training(self):
         """ Check that the mechanics of score training are ok"""
-        from .models import GraphGRU
-        from .utils import do_score_training
+        from daggen.models import GraphGRU
+        from daggen.utils import do_score_training
         from torch.optim import SGD
         
         samples = 10

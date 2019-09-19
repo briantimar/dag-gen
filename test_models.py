@@ -14,7 +14,7 @@ class Test(unittest.TestCase):
 class TestMLP(Test):
 
     def setUp(self):
-        from .models import MLP
+        from daggen.models import MLP
         self.layer_sizes1 = [10, 2]
         self.layer_sizes2 = [10, 5, 2]
         self.mlp1 = MLP(self.layer_sizes1)
@@ -34,21 +34,21 @@ class TestMLP(Test):
 class TestTwoLayerMLP(Test):
 
     def test_sizes(self):
-        from .models import TwoLayerMLP
+        from daggen.models import TwoLayerMLP
         mlp = TwoLayerMLP(5, 4, 2)
         self.assertEqual(mlp.num_layers, 2)
 
 class TestScalarGraphGRU(Test):
 
     def setUp(self):
-        from .models import ScalarGraphGRU
+        from daggen.models import ScalarGraphGRU
         hidden_size=16
         logits_hidden_size=4
         num_activations = 5
         self.test_graph_gru = ScalarGraphGRU(hidden_size, logits_hidden_size, num_activations)
         
     def test_build(self):
-        from .models import ScalarGraphGRU
+        from daggen.models import ScalarGraphGRU
         hidden_size=16
         logits_hidden_size=4
         num_activations = 5
@@ -131,7 +131,7 @@ class TestScalarGraphGRU(Test):
 class TestGraphGRU(Test):
 
     def setUp(self):
-        from .models import GraphGRU
+        from daggen.models import GraphGRU
         
         self.num_input = 2
         self.num_output = 3
@@ -218,12 +218,27 @@ class TestGraphGRU(Test):
         self.assertTensorAlmostEqual(self.graphgru.activation_functions[1](x), -x)
         self.assertTensorAlmostEqual(self.graphgru.activation_functions[2](x), torch.ones_like(x))
 
+    def test__log_probs_from_graph_tensors(self):
+        num_intermediate = torch.tensor([1], dtype=torch.long)
+        conn2 = torch.tensor([[1,1]],dtype=torch.long)
+        conn3 = torch.tensor([[0,0,1]],dtype=torch.long)
+        conn4 = torch.tensor([[0,0,1]],dtype=torch.long)
+        conn5 = torch.tensor([[1,0,0]],dtype=torch.long)
+        connections = [conn2, conn3, conn4, conn5]
+
+        activations = [torch.tensor([0]), torch.tensor([0]), torch.tensor([2]), torch.tensor([1])]
+
+        self.graphgru._log_probs_from_graph_tensors(num_intermediate, connections,activations)
+
+
+
+
 
 class TestBatchDAG(Test):
 
     def setUp(self):
-        from .models import GraphGRU
-        from .models import BatchDAG
+        from daggen.models import GraphGRU
+        from daggen.models import BatchDAG
         self.input_dim = 2
         self.output_dim = 3
         hidden_size = 2
@@ -252,7 +267,7 @@ class TestBatchDAG(Test):
         self.assertEqual(len(self.dag), self.batch_size)
         dags = [dag for dag in self.dag]
         self.assertEqual(len(dags), self.batch_size)
-        from .models import DAG
+        from daggen.models import DAG
         for d in dags:
             self.assertTrue(isinstance(d, DAG))
 
@@ -268,7 +283,7 @@ class TestBatchDAG(Test):
 
     def test__forward_with(self):
         """ Check that batched BatchDAGs actually output the correct result for known examples."""
-        from .models import BatchDAG
+        from daggen.models import BatchDAG
         input_dim = 2
         output_dim = 1
         activation_functions = [lambda x: x, lambda x : -x ]
@@ -302,7 +317,7 @@ class TestBatchDAG(Test):
 class TestDAG(Test):
 
     def setUp(self):
-        from .models import DAG
+        from daggen.models import DAG
         self.input_dim = 1
         self.output_dim = 2
         self.num_intermediate = 1
@@ -313,7 +328,7 @@ class TestDAG(Test):
                                 activation_labels=('a', 'b'))
 
     def test_build(self):
-        from .models import DAG
+        from daggen.models import DAG
         input_dim = 1
         output_dim = 2
         num_intermediate = 1
