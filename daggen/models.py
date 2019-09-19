@@ -558,8 +558,10 @@ class GraphGRU(ScalarGraphGRU):
         
         Let maxnum denote the max number of intermediate vertices among all sampled graphs. Then return values are
                 `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each sampled graph.
-                `connections` maxnum+output_dim length list of byte tensor lists. Each inner list has length maxnum + input_dim.
-                    connections[i][j] is a byte tensor indicating, for each graph in the batch, whether a connection j -> i exists.
+                `connections` maxnum+output_dim length of byte tensors. 
+                    The ith tensor has shape (N, num_prev_emitting), where num_prev_emitting is the number of emitting vertices
+                    that come before receiving vertex i in the graph. 
+                    connections[i][:,j] is a byte tensor indicating, for each graph in the batch, whether a connection j -> i exists.
                 `activations` maxnum+output_dim length list of integer tensors. Each specifies the activation applied at a particular vertex in each graph; 
                      The last output_dim entries always exist and correspond to the activations applied to the output neurons.
                 `log_probs`: maxnum + output_dim length list of log-probabilities.
@@ -796,7 +798,7 @@ class GraphGRU(ScalarGraphGRU):
             batchdag.activation_labels = self.activation_labels
         return [dag for dag in batchdag], log_probs
     
-    def _log_prob_from_graph_tensors(self, num_intermediate, connections, activations): 
+    def _log_probs_from_graph_tensors(self, num_intermediate, connections, activations): 
         """ Compute log probabilities of the graph tensors provided. 
 
             `num_intermediate` (N,) integer tensor specifying the number of intermediate vertices in each graph.
@@ -836,23 +838,11 @@ class GraphGRU(ScalarGraphGRU):
             #check whether another vertex should be added
             vertex_logits = self.vertex_logits(vertex_hidden_state)
         
-            add_vertex, lp_vertex = self._get_samples_and_log_probs(vertex_logits)
+            #whether each graph requires another vertex to be added
+            add_vertex = (num_intermediate > (vertex_index - self.input_dim)).to(dtype=torch.long)
+
+            lp_vertex = self._get_log_probs(vertex_logits, add_vertex)
             
-            #a graph is active only if it has added a vertex at each sampling step.
-            if min_intermediate_vertices is not None and (vertex_index+1 - self.input_dim) <= min_intermediate_vertices:
-                add_vertex = torch.ones(N, dtype=torch.long)
-                lp_vertex = torch.zeros(N, requires_grad=True)
-                min_vertices_satisfied = False
-            else:
-                min_vertices_satisfied = True
-
-            if max_intermediate_vertices is not None and (vertex_index+1 - self.input_dim) > max_intermediate_vertices:
-                add_vertex = torch.zeros(N, dtype=torch.long)
-                lp_vertex = torch.zeros(N, requires_grad=True)
-                max_vertices_satisfied = True
-            else:
-                max_vertices_satisfied = False
-
             active_graphs = active_graphs & (add_vertex > 0)
             #ignore graphs which have already finished sampling
             mask_to_zero = ~active_graphs
