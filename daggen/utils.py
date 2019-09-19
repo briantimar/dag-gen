@@ -18,6 +18,18 @@ def get_activation(name):
         raise ValueError(f"{name} is not a valid activation function.")
     return _ACTIVATIONS[name]
 
+def right_justify(arr, lengths, offset=0):
+    """ Return a right-justified version of the given array (not idempotent).
+    arr: (N, k) tensor
+    lengths: (N,) list of integers, which specify how much of each row of arr is to be shifted
+    offset: int, specifying where the offset starts
+    """
+    justified = torch.zeros_like(arr)
+    for i in range(arr.shape[0]):
+        justified[i, -lengths[i]:] = arr[i, offset:offset+lengths[i]]
+        justified[i, :offset] = arr[i, :offset]
+    return justified
+
 def is_valid_adjacency_matrix(connections, num_intermediate, num_input, num_output):
     """ Check whether input defines a valid, left-justified adjacency matrix.
     `connections`: (max_num_receiving, max_num_emitting) uint8 tensor
@@ -89,12 +101,18 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
     dag.edges(edgelist)
     return dag
 
+
 def do_score_training(dag_model, score_function, 
                         total_samples, batch_size, optimizer, 
                             score_logger=None,
+                            entropy_logger=None,
+                            cost_logger = None,
+                            reward_cost_logger=None, 
+                            entropy_cost_logger=None,
                             network_callbacks=[],
                             log_every=1,
-                            baseline='running_average'):
+                            baseline='running_average', 
+                            entropic_penalty=0.0):
     """
     Run score-based "policy-gradient" training on the given DAG model.
     `dag_model`: A generative model over DAGs which produces DAG objects and associated log-probability tensors
@@ -110,6 +128,7 @@ def do_score_training(dag_model, score_function,
     `baseline`: whether and how to subtract baseline from the score functions.
         choices: ("running_average", `None`)
     `log_every`: Number of update steps between logging.
+    `entropic penalty`: hyperparameter in the cost function used to encourage high entropy in the DAG distribution.
     Training attempts to maximize the expected score via gradient descent. """
 
     if baseline not in ("running_average", None):
@@ -134,7 +153,9 @@ def do_score_training(dag_model, score_function,
             bl = running_avg_score
         elif baseline is None:
             bl = 0
-        return - ((scores - bl) * log_probs).sum()
+        reward_cost = - ((scores - bl) * log_probs).sum() 
+        entropy_cost = entropic_penalty * log_probs.mean()
+        return reward_cost, entropy_cost
 
     batch_scores = []
 
@@ -144,11 +165,13 @@ def do_score_training(dag_model, score_function,
         dags, log_probs = dag_model.sample_networks_with_log_probs(_batch_size)
         scores = torch.tensor(list(map(score_function, dags)))
 
-        cost = cost_function(scores, log_probs)
+        reward_cost, entropy_cost = cost_function(scores, log_probs)
+        cost = reward_cost + entropy_cost
         optimizer.zero_grad()
         cost.backward()
         optimizer.step()
 
+        batch_entropy = -log_probs.mean().item()
         batch_score = scores.mean().item()
         batch_scores.append(batch_score)
         running_avg_score = .9 * running_avg_score + .1 * batch_score
@@ -156,7 +179,15 @@ def do_score_training(dag_model, score_function,
         if update_index % log_every == 0:
             if score_logger is not None:
                 score_logger(batch_score)
+            if entropy_logger is not None:
+                entropy_logger(batch_entropy)
+            if cost_logger is not None:
+                cost_logger(cost.item())
+            if reward_cost_logger is not None:
+                reward_cost_logger(reward_cost.item())
+            if entropy_cost_logger is not None:
+                entropy_cost_logger(entropy_cost.item())
             for callback in network_callbacks:
-                callback(dags)
+                callback(dags, log_probs)
 
     return batch_scores

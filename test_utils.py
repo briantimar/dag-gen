@@ -1,7 +1,18 @@
 import unittest
 import torch
 
-class TestDAGUtils(unittest.TestCase):
+
+def tensor_diff(x, y):
+    return (x - y).abs().sum().item()
+
+class Test(unittest.TestCase):
+    
+    def assertTensorAlmostEqual(self, x, y):
+        """Checks that two tensors are almost equal"""
+        self.assertAlmostEqual(tensor_diff(x, y), 0)
+
+
+class TestDAGUtils(Test):
 
     def test_is_valid_adjacency_matrix(self):
         """ Check whether adjacency tensors are correctly identified."""
@@ -37,7 +48,7 @@ class TestDAGUtils(unittest.TestCase):
         dag = build_graphviz(input_dim, output_dim, num_intermediate, conns, activations, activation_labels)
         self.assertTrue(dag.directed)
 
-class TestModelUtils(unittest.TestCase):
+class TestModelUtils(Test):
 
     def test_get_activation(self):
         from daggen.utils import get_activation
@@ -49,9 +60,22 @@ class TestModelUtils(unittest.TestCase):
         f = get_activation('gauss')
         self.assertAlmostEqual((f(x) - torch.tensor(-1.).exp() ).abs().sum(), 0)
 
+    def test_right_justify(self):
+        from daggen.utils import right_justify
+        a = torch.tensor([[0, 1, 2, -1, -1],
+                          [5, 6,7, 8, -1]])
+        target = torch.tensor([[0, 1, 0, 0, 2],
+                                 [5, 6, 0, 7,8]])
+        offset =2
+        lengths = [1, 2]
+        b = right_justify(a, lengths, offset=offset)
+        self.assertTensorAlmostEqual(target, b)
+
+
+
 # skip becuase this involves actual training...
 @unittest.skip
-class TestTrainingUtils(unittest.TestCase):
+class TestTrainingUtils(Test):
 
     def test_do_score_training(self):
         """ Check that the mechanics of score training are ok"""
