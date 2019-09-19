@@ -674,6 +674,9 @@ class GraphGRU(ScalarGraphGRU):
                 
                 vertex_index += 1
 
+            else:
+                log_probs.append(lp_vertex)
+
         #at this point, there are no more intermediate vertices to sample
         #however, the connections to the output vertices still have to be defined
         maxnum = vertex_index - self.input_dim
@@ -758,7 +761,8 @@ class GraphGRU(ScalarGraphGRU):
         max_num_active = max_num_intermediate + self.output_dim
         assert len(connections_by_vertex) == max_num_active
         assert len(activations_by_vertex) == max_num_active
-        assert len(log_probs_by_vertex) == max_num_active
+        # the extra entry here comes from the probability of the 'stop' token 
+        assert len(log_probs_by_vertex) == max_num_active + 1
        
         #first, stack the activations together
         activations = torch.stack(activations_by_vertex, dim=1)
