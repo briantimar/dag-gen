@@ -76,8 +76,8 @@ class TestModelUtils(Test):
         batch_size = 2
         num_in = 1
         num_out = 1
-        num_intemediate = torch.tensor([1, 2])
-        max_int = num_intemediate.max().item()
+        num_itermediate = torch.tensor([1, 2])
+        max_int = num_itermediate.max().item()
         connections = torch.zeros(batch_size, max_int + num_out, max_int + num_in, dtype=torch.uint8)
         connections[0, 0, 0] = 1
         connections[0, 1, 1] = 1
@@ -86,7 +86,7 @@ class TestModelUtils(Test):
         connections[1, 2, 2] = 1
         activations =torch.tensor([[0, 1, -1], [1, 1, 2]])
 
-        conns_resolved, activations_resolved = to_resolved_tensors(num_intemediate, connections, activations,
+        conns_resolved, activations_resolved = to_resolved_tensors(num_itermediate, connections, activations,
                                                                         num_in, num_out)
         self.assertEqual(len(conns_resolved), max_int + num_out)
         self.assertEqual(len(activations_resolved), max_int + num_out)
@@ -103,8 +103,8 @@ class TestModelUtils(Test):
         batch_size = 2
         num_in = 1
         num_out = 1
-        num_intemediate = torch.tensor([1, 2])
-        max_int = num_intemediate.max().item()
+        num_itermediate = torch.tensor([1, 2])
+        max_int = num_itermediate.max().item()
         connections = torch.zeros(batch_size, max_int + num_out, max_int + num_in, dtype=torch.uint8)
         connections[0, 0, 0] = 1
         connections[0, 1, 1] = 1
@@ -113,10 +113,31 @@ class TestModelUtils(Test):
         connections[1, 2, 2] = 1
         activations =torch.tensor([[0, 1, -1], [1, 1, 2]])
         ds = dag_dataset_from_tensors(num_in, num_out, 
-                                      num_intemediate, connections, activations)
+                                      num_itermediate, connections, activations)
         self.assertEqual(len(ds), 2)
         self.assertTensorAlmostEqual(ds[0].connections, connections[0, ...])
         self.assertTensorAlmostEqual(ds[0].activations, activations[0, ...])
+
+    def test_collate_dags(self):
+        from daggen.models import BatchDAG
+        from daggen.utils import collate_dags
+        batch_size = 2
+        num_in = 1
+        num_out = 1
+        num_itermediate = torch.tensor([1, 2])
+        max_int = num_itermediate.max().item()
+        connections = torch.zeros(batch_size, max_int + num_out, max_int + num_in, dtype=torch.uint8)
+        connections[0, 0, 0] = 1
+        connections[0, 1, 1] = 1
+        connections[1, 0, 0] = 1
+        connections[1, 1, 1] = 1
+        connections[1, 2, 2] = 1
+        activations =torch.tensor([[0, 1, -1], [1, 1, 2]])
+
+        bd = BatchDAG(num_in, num_out, num_itermediate, connections, activations)
+        bd2 = collate_dags([d for d in bd])
+        self.assertTensorAlmostEqual(bd.connections, bd2.connections)
+        self.assertTensorAlmostEqual(bd.activations, bd2.activations)
 
 # skip becuase this involves actual training...
 @unittest.skip

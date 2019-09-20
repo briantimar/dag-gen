@@ -43,6 +43,27 @@ def dag_dataset_from_tensors(input_dim, output_dim,
                     activation_functions=activation_functions, activation_labels=activation_labels, check_shapes=check_shapes)
     return dag_dataset_from_batchdag(bd)
 
+def collate_dags(dags):
+    """ Collates a list of dags into a single BatchDAG."""
+    from .models import BatchDAG
+    input_dim = dags[0].input_dim
+    output_dim = dags[0].output_dim
+    activation_functions = dags[0].activation_functions
+    activation_labels = dags[0].activation_labels
+
+    connections_all = [dag.connections for dag in dags]
+    activations_all = [dag.activations for dag in dags]
+    num_intermediate_all = [dag.num_intermediate for dag in dags]
+
+    connections = torch.cat(connections_all, dim=0)
+    activations = torch.cat(activations_all, dim=0)
+    num_intermediate = torch.cat(num_intermediate_all, dim=0)
+    
+
+    return BatchDAG(input_dim, output_dim, num_intermediate, connections, activations, 
+                    activation_functions=activation_functions, activation_labels=activation_labels, check_shapes=True)
+
+
 def to_resolved_tensors( num_intermediate, connections_left_justified, activations_left_justified, input_dim, output_dim):
     """Convert the given monolithic torch tensors defining a batch of graphs to lists of resolved tensors 
         num_intermediate: (N,) long tensor specifying the number of intermediate vertices in each graph.

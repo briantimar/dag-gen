@@ -244,7 +244,7 @@ class TestGraphGRU(Test):
         lps = self.graphgru.log_probs_from_tensors(num_intermediate, connections, activations)
         self.assertEqual(len(lps), 2)
 
-    def test_log_probs_from_dag(self):
+    def test_log_probs_from_batchdag(self):
         from daggen.models import BatchDAG
 
         activations = torch.tensor([[1, 1, 1, -1], 
@@ -257,7 +257,7 @@ class TestGraphGRU(Test):
 
         dag = BatchDAG(self.graphgru.input_dim, self.graphgru.output_dim, 
                         num_intermediate, connections, activations)
-        lps = self.graphgru.log_probs_from_dag(dag)
+        lps = self.graphgru.log_probs_from_batchdag(dag)
         self.assertEqual(len(lps), 2)
 
 
