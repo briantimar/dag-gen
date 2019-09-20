@@ -179,6 +179,18 @@ def build_empty_graph(input_dim, output_dim, num_intermediate):
 
     return DAG(input_dim, output_dim, num_intermediate, connections, activations, check_valid=True)
 
+def build_fully_connected_graph(input_dim, output_dim, num_intermediate):
+    """ Graph where each vertex is connected to all available ancestors"""
+    from .models import DAG
+    num_emit, num_rec = num_intermediate + input_dim, num_intermediate + output_dim
+    activations = torch.zeros(num_rec, dtype=torch.long)
+    connections = torch.zeros(num_rec, num_emit, dtype=torch.long)
+    for i in range(num_rec):
+        num_anc = min(input_dim + i, num_emit)
+        connections[i, :num_anc] = 1
+    return DAG(input_dim, output_dim, num_intermediate, connections, activations, check_valid=True)
+
+
 ##### TRAINING ROUTINES
 
 def do_score_training(dag_model, score_function, 
