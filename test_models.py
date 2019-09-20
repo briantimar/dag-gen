@@ -233,7 +233,7 @@ class TestGraphGRU(Test):
         lps = self.graphgru._log_probs_from_resolved_tensors(num_intermediate, connections,activations)
         self.assertEqual(len(lps), 1)
 
-    def test_log_prob(self):
+    def test_log_probs_from_tensors(self):
         activations = torch.tensor([[1, 1, 1, -1], 
                                     [1, 1, 1, 1]])
         num_intermediate = torch.tensor([0,1])
@@ -241,7 +241,23 @@ class TestGraphGRU(Test):
         connections[0, :, 0] = 1
         connections[1, 0, :2] = 1
         connections[1, 1:, 2] = 1
-        lps = self.graphgru.log_prob(num_intermediate, connections, activations)
+        lps = self.graphgru.log_probs_from_tensors(num_intermediate, connections, activations)
+        self.assertEqual(len(lps), 2)
+
+    def test_log_probs_from_dag(self):
+        from daggen.models import BatchDAG
+
+        activations = torch.tensor([[1, 1, 1, -1], 
+                                    [1, 1, 1, 1]])
+        num_intermediate = torch.tensor([0,1])
+        connections = torch.zeros(2, 4, 3)
+        connections[0, :, 0] = 1
+        connections[1, 0, :2] = 1
+        connections[1, 1:, 2] = 1
+
+        dag = BatchDAG(self.graphgru.input_dim, self.graphgru.output_dim, 
+                        num_intermediate, connections, activations)
+        lps = self.graphgru.log_probs_from_dag(dag)
         self.assertEqual(len(lps), 2)
 
 

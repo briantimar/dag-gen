@@ -953,7 +953,7 @@ class GraphGRU(ScalarGraphGRU):
 
         return sum(log_probs)
 
-    def log_prob(self, num_intermediate, connections_left_justified, activations_left_justified):
+    def log_probs_from_tensors(self, num_intermediate, connections_left_justified, activations_left_justified):
         """Compute the log-probabilities of the graphs defined by the given connectivity and activation tensors.
             N= batch size of the inputs.
             num_intermediate: (N,) long tensor specifying the number of intermediate vertices in each graph.
@@ -971,3 +971,7 @@ class GraphGRU(ScalarGraphGRU):
                                                                         self.input_dim, self.output_dim)
         return self._log_probs_from_resolved_tensors(num_intermediate, connections_resolved, activations_resolved)
 
+    def log_probs_from_dag(self, dag):
+        """ Compute the log-probability of the given BatchDAG under the current model.
+            Returns: tensor of length len(dag) holding log-probabilities. """
+        return self.log_probs_from_tensors(dag.num_intermediate, dag.connections, dag.activations)
