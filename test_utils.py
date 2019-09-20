@@ -139,6 +139,15 @@ class TestModelUtils(Test):
         self.assertTensorAlmostEqual(bd.connections, bd2.connections)
         self.assertTensorAlmostEqual(bd.activations, bd2.activations)
 
+    def test_build_empty_graph(self):
+        from daggen.utils import build_empty_graph
+        input_dim = 2
+        output_dim = 2
+        num_intermediate = 4
+        dag = build_empty_graph(input_dim, output_dim, num_intermediate)
+        self.assertTensorAlmostEqual(dag.activations, torch.zeros(1, num_intermediate + output_dim, dtype=torch.long))
+        self.assertAlmostEqual(dag.connections.sum().item(), 0)
+
 # skip becuase this involves actual training...
 @unittest.skip
 class TestTrainingUtils(Test):

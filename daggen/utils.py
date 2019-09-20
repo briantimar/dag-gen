@@ -162,6 +162,17 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
     dag.edges(edgelist)
     return dag
 
+#utilites for constructing graphs
+def build_empty_graph(input_dim, output_dim, num_intermediate):
+    """ Returns a graph with no connections and trivial activations. """
+    from .models import DAG
+    num_emit, num_rec = num_intermediate + input_dim, num_intermediate + output_dim
+    activations = torch.zeros(num_rec, dtype=torch.long)
+    connections = torch.zeros(num_rec, num_emit, dtype=torch.long)
+
+    return DAG(input_dim, output_dim, num_intermediate, connections, activations, check_valid=True)
+
+##### TRAINING ROUTINES
 
 def do_score_training(dag_model, score_function, 
                         total_samples, batch_size, optimizer, 
@@ -254,7 +265,7 @@ def do_score_training(dag_model, score_function,
     return batch_scores
 
 def do_generative_graph_modeling(dag_model, graph_dl, 
-                                 optimizer, epochs, logstep=1):
+                                 optimizer, epochs, logstep=1, callbacks=[]):
     """ Train a DAG model on the given dataset of graphs. 
         `dag_model`: a model defining a likelihood function over graphs. Should implement
         a log_prob() method.
@@ -273,6 +284,8 @@ def do_generative_graph_modeling(dag_model, graph_dl,
 
             if batchindex % logstep == 0:
                 nll_loss.append(loss.detach().item())
+                for callback in callbacks:
+                    callback(dag_model)
             
         print(f"Finished epoch {ep}")
     print("Training complete")
