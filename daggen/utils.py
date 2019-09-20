@@ -86,8 +86,15 @@ def to_resolved_tensors( num_intermediate, connections_left_justified, activatio
     activations_resolved = []
     for i in range(num_rec):
         numinputs = min(input_dim + i, num_emit)
-        conns_resolved.append(connections[:, i, :numinputs])
-        activations_resolved.append(activations[:, i])
+        #split up tensors to avoid issues with in-place mods
+        conns = torch.zeros_like(connections[:, i, :numinputs])
+        conns.copy_(connections[:, i, :numinputs])
+
+        acts = torch.zeros_like(activations[:,i])
+        acts.copy_(activations[:,i])
+
+        conns_resolved.append(conns)
+        activations_resolved.append(acts)
 
     return conns_resolved, activations_resolved
 
@@ -265,28 +272,33 @@ def do_score_training(dag_model, score_function,
     return batch_scores
 
 def do_generative_graph_modeling(dag_model, graph_dl, 
-                                 optimizer, epochs, logstep=1, callbacks=[]):
+                                 optimizer, epochs, nll_callback=None, callbacks_with_logsteps=[]):
     """ Train a DAG model on the given dataset of graphs. 
         `dag_model`: a model defining a likelihood function over graphs. Should implement
         a log_prob() method.
         `graph_dl`: a dataloader which yields graphs.
-        logstep: record training data every `logstep` batches
+
     """
 
     nll_loss = []
 
-    for ep in epochs:
+    for ep in range(epochs):
         for batchindex, graph_batch in enumerate(graph_dl):
+            print(batchindex)
             loss = - dag_model.log_probs_from_batchdag(graph_batch).mean()
-            optimzer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            if batchindex % logstep == 0:
-                nll_loss.append(loss.detach().item())
-                for callback in callbacks:
-                    callback(dag_model)
-            
+        loss_rec = loss.detach().item()
+        nll_loss.append(loss_rec)
+        if nll_callback is not None:
+            nll_callback(loss_rec)
+        
+        for logstep, callback in callbacks_with_logsteps:
+            if ep % logstep == 0:
+                callback(dag_model)
+        
         print(f"Finished epoch {ep}")
     print("Training complete")
     return nll_loss
