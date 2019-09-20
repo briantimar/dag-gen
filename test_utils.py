@@ -98,6 +98,26 @@ class TestModelUtils(Test):
         self.assertTensorAlmostEqual(conns_resolved[1], torch.tensor([[0,0], [0,1]], dtype=torch.uint8))
         self.assertTensorAlmostEqual(conns_resolved[2], torch.tensor([[0,1,0], [0,0,1]], dtype=torch.uint8))
 
+    def test_dag_dataset_from_tensors(self):
+        from daggen.utils import dag_dataset_from_tensors
+        batch_size = 2
+        num_in = 1
+        num_out = 1
+        num_intemediate = torch.tensor([1, 2])
+        max_int = num_intemediate.max().item()
+        connections = torch.zeros(batch_size, max_int + num_out, max_int + num_in, dtype=torch.uint8)
+        connections[0, 0, 0] = 1
+        connections[0, 1, 1] = 1
+        connections[1, 0, 0] = 1
+        connections[1, 1, 1] = 1
+        connections[1, 2, 2] = 1
+        activations =torch.tensor([[0, 1, -1], [1, 1, 2]])
+        ds = dag_dataset_from_tensors(num_in, num_out, 
+                                      num_intemediate, connections, activations)
+        self.assertEqual(len(ds), 2)
+        self.assertTensorAlmostEqual(ds[0].connections, connections[0, ...])
+        self.assertTensorAlmostEqual(ds[0].activations, activations[0, ...])
+
 # skip becuase this involves actual training...
 @unittest.skip
 class TestTrainingUtils(Test):

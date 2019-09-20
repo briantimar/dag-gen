@@ -11,7 +11,6 @@ _ACTIVATIONS = {'id': lambda x : x,
                     'bias1': lambda x : torch.ones_like(x),
                     }
     
-
 def get_activation(name):
     """Returns one of several standard activation functions."""
     if name not in _ACTIVATIONS.keys():
@@ -30,6 +29,19 @@ def right_justify(arr, lengths, output_dim):
         justified[i, :lengths[i], ...] = arr[i, :lengths[i], ...]
     return justified
 
+def dag_dataset_from_batchdag(batchdag):
+    """ Constructs a dataset of DAGs from a single BatchDAG. """
+    from .models import DAGDataset
+    return DAGDataset([d for d in batchdag])
+
+def dag_dataset_from_tensors(input_dim, output_dim,
+                num_intermediate, connections, activations, 
+                activation_functions=None, activation_labels=None, check_shapes=True):
+    """ Creates a dataset of DAGS based on the given batched connectivity and activation tensors."""
+    from .models import BatchDAG
+    bd = BatchDAG(input_dim, output_dim, num_intermediate, connections, activations, 
+                    activation_functions=activation_functions, activation_labels=activation_labels, check_shapes=check_shapes)
+    return dag_dataset_from_batchdag(bd)
 
 def to_resolved_tensors( num_intermediate, connections_left_justified, activations_left_justified, input_dim, output_dim):
     """Convert the given monolithic torch tensors defining a batch of graphs to lists of resolved tensors 
@@ -219,3 +231,28 @@ def do_score_training(dag_model, score_function,
                 callback(dags, log_probs)
 
     return batch_scores
+
+def do_generative_graph_modeling(dag_model, graph_dl, 
+                                 optimizer, epochs, logstep=1):
+    """ Train a DAG model on the given dataset of graphs. 
+        `dag_model`: a model defining a likelihood function over graphs. Should implement
+        a log_prob() method.
+        `graph_dl`: a dataloader which yields graphs.
+        logstep: record training data every `logstep` batches
+    """
+
+    nll_loss = []
+
+    for ep in epochs:
+        for batchindex, graph_batch in enumerate(graph_dl):
+            loss = - dag_model.log_prob(graph_batch).mean()
+            optimzer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            if batchindex % logstep == 0:
+                nll_loss.append(loss.detach().item())
+            
+        print(f"Finished epoch {ep}")
+    print("Training complete")
+    return nll_loss
