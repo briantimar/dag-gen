@@ -251,6 +251,7 @@ class TestGraphGRU(Test):
         
         lps = self.graphgru.log_probs_from_tensors(num_intermediate, connections, activations)
         self.assertEqual(len(lps), 2)
+        lps.mean().backward()
 
     def test_log_probs_from_batchdag(self):
         from daggen.models import BatchDAG
@@ -267,6 +268,7 @@ class TestGraphGRU(Test):
                         num_intermediate, connections, activations)
         lps = self.graphgru.log_probs_from_batchdag(dag)
         self.assertEqual(len(lps), 2)
+        lps.mean().backward()
 
 
 
