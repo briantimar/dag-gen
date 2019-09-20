@@ -2,6 +2,7 @@
 
 import torch
 from torch.distributions.categorical import Categorical
+from torch.utils.data import Dataset
 from .utils import is_valid_adjacency_matrix
 
 
@@ -280,6 +281,20 @@ class DAG(BatchDAG):
         return build_graphviz(self.input_dim, self.output_dim, self.num_intermediate[0], 
                                 self.connections[0, ...], self.activations[0, ...],self.activation_labels)
            
+
+class DAGDataset(Dataset):
+    """A dataset of DAGs. These should be individual DAGs, not BatchDAGs."""
+
+    def __init__(self, list_of_dags):
+        super().__init__()
+        self.dags = list_of_dags
+
+    def __getitem__(self, i):
+        return self.dags[i]
+    
+    def __len__(self):
+        return len(self.dags)
+
 
 class DAGDistribution(torch.nn.Module):
     """ PyTorch model which defines a distribution over directed acyclic graphs. 
@@ -971,7 +986,7 @@ class GraphGRU(ScalarGraphGRU):
                                                                         self.input_dim, self.output_dim)
         return self._log_probs_from_resolved_tensors(num_intermediate, connections_resolved, activations_resolved)
 
-    def log_probs_from_dag(self, dag):
+    def log_probs_from_batchdag(self, dag):
         """ Compute the log-probability of the given BatchDAG under the current model.
             Returns: tensor of length len(dag) holding log-probabilities. """
         return self.log_probs_from_tensors(dag.num_intermediate, dag.connections, dag.activations)

@@ -266,7 +266,7 @@ def do_generative_graph_modeling(dag_model, graph_dl,
 
     for ep in epochs:
         for batchindex, graph_batch in enumerate(graph_dl):
-            loss = - dag_model.log_prob(graph_batch).mean()
+            loss = - dag_model.log_probs_from_batchdag(graph_batch).mean()
             optimzer.zero_grad()
             loss.backward()
             optimizer.step()
