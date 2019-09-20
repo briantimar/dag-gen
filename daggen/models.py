@@ -878,6 +878,8 @@ class GraphGRU(ScalarGraphGRU):
             ##intermediate eval halts when no graphs are active
             graph_complete = ( active_graphs.sum().item()==0 )
 
+
+
             if not graph_complete:
                 #now pass hidden state down to edge cells
                 edge_hidden_state = vertex_hidden_state
@@ -892,12 +894,17 @@ class GraphGRU(ScalarGraphGRU):
                     
                     #likelihood of connection to prev_index
                     connection_logits = self.edge_logits(edge_hidden_state)
-                    prev_conn = vertex_connections[:, prev_index]
+                    #need to make sure prev_conn is stored as a separate tensor, so that in-place modifications don't affect
+                    # other values of prev_index!
+                    prev_conn = torch.zeros(N, dtype=torch.long)
+                    prev_conn.copy_(vertex_connections[:, prev_index])
+
                     lp_connection = self._get_log_probs(connection_logits, prev_conn, mask_to_zero=mask_to_zero)
-                                        
+                    
                     lp_vertex = lp_vertex + lp_connection
                     
                     edge_input = prev_conn.view(N, 1).to(dtype=torch.float)
+
 
                 # now compute the log-probability of activation
                 activation = activations[vertex_index - self.input_dim]
@@ -906,7 +913,7 @@ class GraphGRU(ScalarGraphGRU):
 
                 lp_act = self._get_log_probs(act_logits, activation, mask_to_zero=mask_to_zero)
                 lp_vertex = lp_vertex + lp_act
-
+                
                 #record the conditional log-probability for everything sampled at this vertex
                 log_probs.append(lp_vertex)
 
@@ -914,6 +921,8 @@ class GraphGRU(ScalarGraphGRU):
                 vertex_input = torch.cat((edge_hidden_state, activation.view(-1, 1).to(dtype=torch.float)), dim=1)
                 
                 vertex_index += 1
+
+   
 
             else:
                 #record log-prob corresponding to the 'stop' token
@@ -940,8 +949,10 @@ class GraphGRU(ScalarGraphGRU):
                 edge_hidden_state = self.edge_cell(edge_input, edge_hidden_state)            
                 #sample connectivity to prev_index
                 connection_logits = self.edge_logits(edge_hidden_state)
-                                
-                prev_conn = vertex_connections[:, prev_index]
+                
+                prev_conn = torch.zeros(N, dtype=torch.long)
+                prev_conn.copy_(vertex_connections[:, prev_index])
+
                 # check that the requested connections are actually possible
                 vertex_exists = (num_intermediate + self.input_dim) > prev_index
                 mask_to_zero = ~vertex_exists

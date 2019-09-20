@@ -84,6 +84,11 @@ class TestScalarGraphGRU(Test):
         self.assertEqual(tuple(lps.shape), (3,))
         self.assertTensorAlmostEqual(lps.exp(), torch.ones(3)/4.0)
 
+        logits = torch.zeros(3, 4, requires_grad=True)
+        mask = torch.as_tensor([False, True, False])
+        lps = self.test_graph_gru._get_log_probs(logits, samples, mask_to_zero=mask)
+        lps.mean().backward()
+
     def test__sample_graph_tensors_resolved_logprobs(self):
         batch_size=5
         max_vertices=4
@@ -232,6 +237,8 @@ class TestGraphGRU(Test):
 
         lps = self.graphgru._log_probs_from_resolved_tensors(num_intermediate, connections,activations)
         self.assertEqual(len(lps), 1)
+        #check backward pass
+        lps.mean().backward()
 
     def test_log_probs_from_tensors(self):
         activations = torch.tensor([[1, 1, 1, -1], 
@@ -241,6 +248,7 @@ class TestGraphGRU(Test):
         connections[0, :, 0] = 1
         connections[1, 0, :2] = 1
         connections[1, 1:, 2] = 1
+        
         lps = self.graphgru.log_probs_from_tensors(num_intermediate, connections, activations)
         self.assertEqual(len(lps), 2)
 
