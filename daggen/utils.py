@@ -284,7 +284,7 @@ def dag_from_dot(graphviz):
 
     #build connection and activation tensors
     activations = torch.as_tensor(activation_indices, dtype=torch.long)
-    connections = torch.zeros(num_receiving, num_emitting, dtype=torch.uint8)
+    connections = torch.zeros(num_receiving, num_emitting, dtype=torch.long)
 
     #populate the connection tensor
     for j in range(i, len(lines)):
@@ -297,17 +297,15 @@ def dag_from_dot(graphviz):
             raise ValueError(f"Invalid connection {ln}")
         connections[n2-num_input, n1] = 1
     
-    
+    num_act = len(set(activation_indices))
     activation_labels = []
     #sort the activations as in the original graph, for convenience
-    for i in range(num_receiving):
-        ia = activation_indices.find(i)
+    for i in range(num_act):
+        ia = activation_indices.index(i)
         activation_labels.append(_activation_labels[ia])
-        activations[i] = activation_indices
-
     
     num_intermediate = torch.as_tensor(num_intermediate, dtype=torch.long)
-    dag = DAG(input_dim, output_dim, num_intermediate, connections, activations, check_valid=True)
+    dag = DAG(num_input, num_output, num_intermediate, connections, activations, check_valid=True)
     dag.set_activation_functions(activation_labels)
     return dag
 

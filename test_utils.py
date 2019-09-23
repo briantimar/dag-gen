@@ -176,13 +176,16 @@ class TestModelUtils(Test):
         for ns, target in zip(nodestrings, targets):
             self.assertEqual(parse_nodeline(ns), target)
 
-    # def test_dag_from_dot(self):
-    #     from daggen.utils import dag_from_dot, build_fully_connected_graph
-    #     from graphviz import Digraph
+    def test_dag_from_dot(self):
+        from daggen.utils import dag_from_dot, build_fully_connected_graph
+        from graphviz import Digraph
 
-    #     dag = build_fully_connected_graph(1, 1, 1)
-    #     dag.set_activation_functions(['id'])
-    #     dag2 = dag_from_dot(dag.to_graphviz().source)
+        dag = build_fully_connected_graph(1, 1, 1)
+        dag.set_activation_functions(['id'])
+        dag2 = dag_from_dot(dag.to_graphviz().source)
+        self.assertTensorAlmostEqual(dag2.activations, dag.activations)
+        self.assertTensorAlmostEqual(dag2.connections, dag.connections)
+        self.assertEqual(dag.activation_labels, dag2.activation_labels)
 
 # skip becuase this involves actual training...
 @unittest.skip
