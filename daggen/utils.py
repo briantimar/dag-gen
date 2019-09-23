@@ -153,7 +153,7 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
     for i in range(size):
         node=str(i)
         if i < input_dim:
-            label = "inp%d" % i
+            label = "input %d" % i
             attrs = {}
         else:
             act_index = activations[i-input_dim].item()
@@ -163,7 +163,7 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
                 'activation_label': str(act_label)
                 }            
             if i >= num_emitting:
-                label = f"out{i-num_emitting}"
+                label = f"output {i-num_emitting}"
             else:
                 label = None
 
@@ -178,40 +178,138 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
     dag.edges(edgelist)
     return dag
 
-# def dag_from_graphviz(graphviz, num_input, num_output):
-#     """ Constructs a DAG object from the graphviz source provided.
-#         graphviz: a string containing graphviz source code
-#         num_input: how many nodes in the graph can receive input
-#         num_output: how many nodes in the graph emit output."""
-#     edge_token = '->'
+def lex_dot_attrstr(attrstr):
+    "Takes a string of attributes from a DOT source file and returns list of name, value string pairs"
+    name = ''
+    val = ''
+    pairs = []
+    in_quote = False
+    active = 'name'
+    for c in attrstr:
+        # print(c, name, val, in_quote, active)
+        if c == '"':
+            in_quote = not in_quote
+        else:
+            if not in_quote and c == '=':
+                if active == 'name':
+                    active = 'val'
+                else:
+                    raise SyntaxError
+            elif not in_quote and c == ' ':
+                if active != 'val':
+                    raise SyntaxError
+                active = 'name'
+                if len(name) > 0:
+                    pairs.append((name, val))
+                name = ''
+                val = ''
+            else:
+                if active == 'name':
+                    name += c
+                else:
+                    val += c
+    if len(name) > 0:
+        pairs.append((name, val))
+    return pairs
+            
+
+def parse_nodeline(nodeline):
+    """Returns node label, and dict holding attributes, extracted from a given graphviz node line. """
+    start = '['
+    end = ']'
+    if not (start in nodeline and end in nodeline):
+        return nodeline.replace('\t', '').replace(' ', ''), {}
     
-#     lines = graphviz.split('\n')
-#     if lines[0] != 'digraph {' or lines[-1] != '}'
-#         raise ValueError("Invalid graphviz source!")
-#     lines = lines[1:-1]
+    attrs = {}
+    start_ind = nodeline.find(start)
+    end_ind = nodeline.find(end)
+
+    node_label = nodeline[:start_ind].replace('\t', '').replace(' ', '')
+
+    attrstr = nodeline[start_ind+1:end_ind]
+    attrpairs = lex_dot_attrstr(attrstr)
+
+    for name, val in attrpairs:
+        attrs[name] = val
     
-#     i = 0
-#     while edge_token not in lines[i]:
-#         i += 1
-#     size = i
-#     if size < num_input + num_output:
-#         raise ValueError(f"Graph of size {size} is incompatible with input dim {num_input}, output dim {num_output}")
+    return node_label, attrs
 
-#     num_intermediate = size - (num_input + num_output)
-#     num_emitting = num_intermediate + num_input
-#     num_receiving = num_intermediate + num_output
+def dag_from_dot(graphviz):
+    """ Constructs a DAG object from the DOT source provided.
+        graphviz: a string containing graphviz source code
+        num_input: how many nodes in the graph can receive input
+        num_output: how many nodes in the graph emit output."""
+    from .models import DAG
+    edge_token = '->'
+    
+    lines = graphviz.split('\n')
+    if lines[0] != 'digraph {' or lines[-1] != '}':
+        raise ValueError("Invalid graphviz source!")
+    lines = lines[1:-1]
+    
+    _activation_labels = []
+    activation_indices = []
+    i = 0
+    num_input = 0
+    num_output = 0
+    #node lines
+    while edge_token not in lines[i]:
+        
+        node, attrs = parse_nodeline(lines[i])
+        if int(node) != i:
+            raise ValueError(f"Unexpected node {node}")
+        label = attrs.get('label', '')
+        act_index = attrs.get('activation_index')
+        act_label = attrs.get('activation_label')
+        if 'input' in label:
+            num_input += 1
+            if act_index is not None:
+                raise ValueError("Activation applied to input node.")
+        elif 'output' in label:
+            num_output += 1
+        if act_index is not None:
+            activation_indices.append(int(act_index))
+            _activation_labels.append(act_label)
 
-#     #build connection and activation tensors
-#     activations = torch.zeros(num_receiving, dtype=torch.long)
-#     connections = torch.zeros(num_receiving, num_emitting, dtype=torch.uint8)
+        i += 1
 
-#     for j in range(i, len(lines)):
-#         ln = lines[j].replace('\t', '').replace(' ', '')
-#         nodes = ln.split(edge_token)
-#         if len(nodes) != 2:
-#             raise ValueError("Invalid graphviz source!")
-#         n1, n2 = int(nodes[0]), int(nodes[1])
+    size = i
 
+    num_intermediate = size - (num_input + num_output)
+    num_emitting = num_intermediate + num_input
+    num_receiving = num_intermediate + num_output
+
+    if len(activation_indices) != num_receiving:
+        raise ValueError("Invalid activation specification.")
+
+    #build connection and activation tensors
+    activations = torch.as_tensor(activation_indices, dtype=torch.long)
+    connections = torch.zeros(num_receiving, num_emitting, dtype=torch.uint8)
+
+    #populate the connection tensor
+    for j in range(i, len(lines)):
+        ln = lines[j].replace('\t', '').replace(' ', '')
+        nodes = ln.split(edge_token)
+        if len(nodes) != 2:
+            raise ValueError("Invalid graphviz source!")
+        n1, n2 = int(nodes[0]), int(nodes[1])
+        if n1 >= num_emitting or n2 < num_input:
+            raise ValueError(f"Invalid connection {ln}")
+        connections[n2-num_input, n1] = 1
+    
+    
+    activation_labels = []
+    #sort the activations as in the original graph, for convenience
+    for i in range(num_receiving):
+        ia = activation_indices.find(i)
+        activation_labels.append(_activation_labels[ia])
+        activations[i] = activation_indices
+
+    
+    num_intermediate = torch.as_tensor(num_intermediate, dtype=torch.long)
+    dag = DAG(input_dim, output_dim, num_intermediate, connections, activations, check_valid=True)
+    dag.set_activation_functions(activation_labels)
+    return dag
 
 
 #utilites for constructing graphs

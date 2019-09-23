@@ -158,6 +158,32 @@ class TestModelUtils(Test):
         self.assertAlmostEqual(dag.connections.sum().item(), sum(input_dim + i for i in range(num_intermediate)) + 
                                                             output_dim * (num_intermediate + input_dim) )
 
+    def test_lex_dot_attrstr(self):
+        from daggen.utils import lex_dot_attrstr
+        inputs = ["", "a=b", "a=b c=d", 'a="input 0" b=thing']
+        targets = [[], [('a', 'b')], [('a', 'b'), ('c', 'd')], 
+                    [('a', 'input 0'), ('b', 'thing')]]
+        for attrstr, target in zip(inputs, targets):
+            self.assertEqual(lex_dot_attrstr(attrstr), target)
+
+    def test_parse_nodeline(self):
+        from daggen.utils import parse_nodeline
+        nodestrings = ['0', '0 [label=mylabel]', 
+                            '1 [label=a attr=2]', 
+                            '2 [label="input 0" name="myname"]']
+        targets = [ ('0',{}), ('0', {'label': 'mylabel'}), ('1',{'label': 'a', 'attr': '2'}), 
+                    ('2', {'label': 'input 0', 'name': 'myname'})]
+        for ns, target in zip(nodestrings, targets):
+            self.assertEqual(parse_nodeline(ns), target)
+
+    # def test_dag_from_dot(self):
+    #     from daggen.utils import dag_from_dot, build_fully_connected_graph
+    #     from graphviz import Digraph
+
+    #     dag = build_fully_connected_graph(1, 1, 1)
+    #     dag.set_activation_functions(['id'])
+    #     dag2 = dag_from_dot(dag.to_graphviz().source)
+
 # skip becuase this involves actual training...
 @unittest.skip
 class TestTrainingUtils(Test):
