@@ -279,7 +279,7 @@ def do_score_training(dag_model, score_function,
             if entropy_cost_logger is not None:
                 entropy_cost_logger(entropy_cost.item())
             for callback in network_callbacks:
-                callback(dags, log_probs)
+                callback(update_index, dags, log_probs)
 
     return batch_scores
 
