@@ -153,9 +153,11 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
     for i in range(size):
         node=str(i)
         if i < input_dim:
-            label = 'inp%d' % i
+            label = "inp%d" % i
         else:
-            label = activation_labels[activations[i-input_dim]]
+            act_index = activations[i-input_dim]
+            act_name = activation_labels[act_index]
+            label= f"{act_name}({act_index})"            
             if i >= num_emitting:
                 label = f"out{i-num_emitting};{label}"
         dag.node(node, label=label)
@@ -168,6 +170,42 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
                 edgelist.append((str(emitting_index), str(rec_index)))
     dag.edges(edgelist)
     return dag
+
+# def dag_from_graphviz(graphviz, num_input, num_output):
+#     """ Constructs a DAG object from the graphviz source provided.
+#         graphviz: a string containing graphviz source code
+#         num_input: how many nodes in the graph can receive input
+#         num_output: how many nodes in the graph emit output."""
+#     edge_token = '->'
+    
+#     lines = graphviz.split('\n')
+#     if lines[0] != 'digraph {' or lines[-1] != '}'
+#         raise ValueError("Invalid graphviz source!")
+#     lines = lines[1:-1]
+    
+#     i = 0
+#     while edge_token not in lines[i]:
+#         i += 1
+#     size = i
+#     if size < num_input + num_output:
+#         raise ValueError(f"Graph of size {size} is incompatible with input dim {num_input}, output dim {num_output}")
+
+#     num_intermediate = size - (num_input + num_output)
+#     num_emitting = num_intermediate + num_input
+#     num_receiving = num_intermediate + num_output
+
+#     #build connection and activation tensors
+#     activations = torch.zeros(num_receiving, dtype=torch.long)
+#     connections = torch.zeros(num_receiving, num_emitting, dtype=torch.uint8)
+
+#     for j in range(i, len(lines)):
+#         ln = lines[j].replace('\t', '').replace(' ', '')
+#         nodes = ln.split(edge_token)
+#         if len(nodes) != 2:
+#             raise ValueError("Invalid graphviz source!")
+#         n1, n2 = int(nodes[0]), int(nodes[1])
+
+
 
 #utilites for constructing graphs
 def build_empty_graph(input_dim, output_dim, num_intermediate):
