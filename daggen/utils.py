@@ -154,13 +154,20 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
         node=str(i)
         if i < input_dim:
             label = "inp%d" % i
+            attrs = {}
         else:
-            act_index = activations[i-input_dim]
-            act_name = activation_labels[act_index]
-            label= f"{act_name}({act_index})"            
+            act_index = activations[i-input_dim].item()
+            act_label = activation_labels[act_index]
+            attrs = {
+                'activation_index': str(act_index),
+                'activation_label': str(act_label)
+                }            
             if i >= num_emitting:
-                label = f"out{i-num_emitting};{label}"
-        dag.node(node, label=label)
+                label = f"out{i-num_emitting}"
+            else:
+                label = None
+
+        dag.node(node, label=label, **attrs)
     #add edges
     edgelist = []
     for i in range(num_receiving):
