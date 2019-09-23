@@ -253,14 +253,19 @@ class DAG(BatchDAG):
         y = super().forward(x)
         return y
 
-    def sample_action_with_log_prob(self, state):
-        """This is implemented only for compatibility with my policy-gradient training code. 
+    def sample_action_with_log_prob(self, state, stochastic=True):
+        """This is implemented for compatibility with my policy-gradient training code. 
             Given input state (singleton or 1d tensor) return action in [0, ... output_dim) defined by 
-            sampling from the categorical distribution which uses DAG logits as final layer. """
+            sampling from the categorical distribution which uses DAG logits as final layer. 
+            stochastic: bool. If False, actions will be selected deterministically as the argmax of logits."""
         logits = self.forward(state)
-        dist = Categorical(logits=logits)
-        action = dist.sample()
-        log_prob = dist.log_prob(action)
+        if stochastic:
+            dist = Categorical(logits=logits)
+            action = dist.sample()
+            log_prob = dist.log_prob(action)
+        else:
+            action = logits.argmax(dim=-1)
+            log_prob = torch.zeros_like(action, dtype=torch.float)
         return action, log_prob
 
     def get_num_intermediate(self):

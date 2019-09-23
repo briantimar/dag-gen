@@ -425,5 +425,8 @@ class TestDAG(Test):
         self.assertEqual(lp.shape, ())
         self.assertTrue(a.item() < self.dag.output_dim)
 
+        a, lp = self.dag.sample_action_with_log_prob(inp, stochastic=False)
+        self.assertTensorAlmostEqual(lp, torch.zeros_like(lp))
+
 if __name__ == "__main__":
     unittest.main()
