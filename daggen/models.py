@@ -110,10 +110,11 @@ class BatchDAG:
         self.activation_labels = activation_labels
         self.activation_functions = [get_activation(label) for label in activation_labels]
 
-    def _forward_with(self, x, activation_choices):
+    def _forward_with(self, x, activation_choices, weight=1.0):
         """ Compute forward passes for each of the networks on a single input.
             `x`: (M, input_dim) input tensor 
             `activation_choices`: list of candidate activation functions.
+            `weight`: float, default 1.0. The weight associated with each edge in the computational graph.
             Returns: (M, N,output_dim), obtained by applying the ith network to the ith element of x.
             """
         if len(x.shape) == 1:
@@ -146,7 +147,7 @@ class BatchDAG:
             #(M, N, num_inputs) float tensor of existing values in the graph
             input_emitters = emitters[:, :, :largest_input_index]
             #(M, N, num_inputs) tensor of  inputs into the given vertex
-            inputs = input_vertices.to(dtype=torch.float).unsqueeze(0) * input_emitters
+            inputs = input_vertices.to(dtype=torch.float).unsqueeze(0) * input_emitters * weight
             #(M, N) tensor of summed inputs at the given vertex
             summed_input = inputs.sum(dim=-1)
             
@@ -169,13 +170,14 @@ class BatchDAG:
             outputs = outputs.view(self.batch_size, self.output_dim)
         return outputs
 
-    def forward(self, x):
+    def forward(self, x, weight=1.0):
         """ Performs forward pass on the inputs x. Requires self.activation_functions to be set. 
             `x`: (data_batch_size, input_size) tensor of inputs.
+            `weight`: float, default 1.0. A weight to associate with each edge in the computational graph.
             Returns: (data_batch_size, dag_batch_size,  output_size) tensor of outputs."""
         if self.activation_functions is None:
             raise ValueError("Activation functions must be set before forward() is called.")
-        return self._forward_with(x, self.activation_functions)
+        return self._forward_with(x, self.activation_functions, weight=weight)
 
     
     def to_graphviz(self):
@@ -234,23 +236,25 @@ class DAG(BatchDAG):
     def __len__(self):
         raise TypeError
 
-    def _forward_with(self, x, activation_choices):
+    def _forward_with(self, x, activation_choices, weight=1.0):
         """ Compute forward through the dag, using the activation functions provided
         `x`: (M, input_dim) input tensor 
         `activation_choices`: list of candidate activation functions.
+        `weight`: float, default 1.0. Scalar weight associated with each edge in the computational graph.
         Returns: (M, output_dim), output tensor
         """
-        y = super()._forward_with(x, activation_choices)
+        y = super()._forward_with(x, activation_choices,weight=weight)
         if len(x.shape) == 1 :
             return y.view(self.output_dim)
         return y.view(x.size(0), self.output_dim)
 
-    def forward(self, x):
+    def forward(self, x, weight=1.0):
         """ Compute forward through the dag
         `x`: (M, input_dim) input tensor 
+        `weight`: float, default 1.0. A weight to associate with each edge in the computational graph.
         Returns: (M, output_dim), output tensor.
         """
-        y = super().forward(x)
+        y = super().forward(x, weight=weight)
         return y
 
     def sample_action_with_log_prob(self, state, stochastic=True):

@@ -386,7 +386,6 @@ class TestDAG(Test):
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
         self.assertTensorAlmostEqual(y, target)
         
-
     def test_forward(self):
         x = torch.tensor([0, 1]).view(2, 1)
         activation_choices = [lambda x: x, lambda x: torch.ones_like(x)]
@@ -394,6 +393,10 @@ class TestDAG(Test):
         y = self.dag.forward(x)
         target = torch.tensor([ [0, 1], [2, 1] ], dtype=torch.float)
         self.assertTensorAlmostEqual(y, target)
+
+        self.dag.activation_functions = [lambda x:x, lambda x: x.relu()]
+        y = self.dag.forward(x, weight=0.)
+        self.assertTensorAlmostEqual(y, torch.zeros_like(y))
 
     def test_to_graphviz(self):
         from graphviz import Digraph
