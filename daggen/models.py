@@ -85,6 +85,9 @@ class BatchDAG:
         self.max_size = self.max_receiving + input_dim
         self.batch_size = self.num_intermediate.size(0)
 
+        #shared weight to apply to edges
+        self.weight = 1.0
+
         if check_shapes:
             if tuple(num_intermediate.shape) != (self.batch_size,):
                 raise ValueError(f"Invalid num_intermediate shape {num_intermediate.shape}")
@@ -170,14 +173,16 @@ class BatchDAG:
             outputs = outputs.view(self.batch_size, self.output_dim)
         return outputs
 
-    def forward(self, x, weight=1.0):
+    def forward(self, x, weight=None):
         """ Performs forward pass on the inputs x. Requires self.activation_functions to be set. 
             `x`: (data_batch_size, input_size) tensor of inputs.
-            `weight`: float, default 1.0. A weight to associate with each edge in the computational graph.
+            `weight`: if not None, weight to associate with each edge in the computational graph.
+                if None, self.weight is used.
             Returns: (data_batch_size, dag_batch_size,  output_size) tensor of outputs."""
+        wt = self.weight if weight is None else weight
         if self.activation_functions is None:
             raise ValueError("Activation functions must be set before forward() is called.")
-        return self._forward_with(x, self.activation_functions, weight=weight)
+        return self._forward_with(x, self.activation_functions, weight=wt)
 
     
     def to_graphviz(self):
@@ -248,10 +253,10 @@ class DAG(BatchDAG):
             return y.view(self.output_dim)
         return y.view(x.size(0), self.output_dim)
 
-    def forward(self, x, weight=1.0):
+    def forward(self, x, weight=None):
         """ Compute forward through the dag
         `x`: (M, input_dim) input tensor 
-        `weight`: float, default 1.0. A weight to associate with each edge in the computational graph.
+        `weight`: if not None, weight to associate with each edge in the computational graph.
         Returns: (M, output_dim), output tensor.
         """
         y = super().forward(x, weight=weight)
