@@ -242,7 +242,7 @@ def dag_from_dot(graphviz):
     from .models import DAG
     edge_token = '->'
     
-    lines = graphviz.split('\n')
+    lines = list(filter(lambda s: len(s) > 0, graphviz.split('\n')))
     if lines[0] != 'digraph {' or lines[-1] != '}':
         raise ValueError("Invalid graphviz source!")
     lines = lines[1:-1]
@@ -309,6 +309,10 @@ def dag_from_dot(graphviz):
     dag.set_activation_functions(activation_labels)
     return dag
 
+def dag_from_dot_filename(fname):
+    """ Loads DAG from the given DOT file."""
+    with open(fname) as f:
+        return dag_from_dot(f.read())
 
 #utilites for constructing graphs
 def build_empty_graph(input_dim, output_dim, num_intermediate):
