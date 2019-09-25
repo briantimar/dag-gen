@@ -181,7 +181,8 @@ class TestModelUtils(Test):
         from graphviz import Digraph
 
         dag = build_fully_connected_graph(1, 1, 1)
-        dag.set_activation_functions(['id'])
+        dag.set_activation_functions(['id', 'relu'])
+        print(dag.to_graphviz().source)
         dag2 = dag_from_dot(dag.to_graphviz().source)
         self.assertTensorAlmostEqual(dag2.activations, dag.activations)
         self.assertTensorAlmostEqual(dag2.connections, dag.connections)

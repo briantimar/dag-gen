@@ -176,6 +176,8 @@ def build_graphviz(input_dim, output_dim, num_intermediate,
             if connections[i, emitting_index] > 0:
                 edgelist.append((str(emitting_index), str(rec_index)))
     dag.edges(edgelist)
+    act_mapping = {str(i) : activation_labels[i] for i in range(len(activation_labels))}
+    dag.attr(**act_mapping)
     return dag
 
 def lex_dot_attrstr(attrstr):
@@ -286,23 +288,27 @@ def dag_from_dot(graphviz):
     activations = torch.as_tensor(activation_indices, dtype=torch.long)
     connections = torch.zeros(num_receiving, num_emitting, dtype=torch.long)
 
+    all_activation_labels = {}
     #populate the connection tensor
     for j in range(i, len(lines)):
-        ln = lines[j].replace('\t', '').replace(' ', '')
-        nodes = ln.split(edge_token)
-        if len(nodes) != 2:
-            raise ValueError("Invalid graphviz source!")
-        n1, n2 = int(nodes[0]), int(nodes[1])
-        if n1 >= num_emitting or n2 < num_input:
-            raise ValueError(f"Invalid connection {ln}")
-        connections[n2-num_input, n1] = 1
-    
-    num_act = len(set(activation_indices))
-    activation_labels = []
-    #sort the activations as in the original graph, for convenience
-    for i in range(num_act):
-        ia = activation_indices.index(i)
-        activation_labels.append(_activation_labels[ia])
+
+        if edge_token in lines[j]:
+            # a connection
+            ln = lines[j].replace('\t', '').replace(' ', '')
+            nodes = ln.split(edge_token)
+            if len(nodes) != 2:
+                raise ValueError("Invalid graphviz source!")
+            n1, n2 = int(nodes[0]), int(nodes[1])
+            if n1 >= num_emitting or n2 < num_input:
+                raise ValueError(f"Invalid connection {ln}")
+            connections[n2-num_input, n1] = 1
+        else:
+            #activation labels
+            for indx, name in lex_dot_attrstr(lines[j]):
+                all_activation_labels[int(indx)] = name
+
+    num_act = len(all_activation_labels)
+    activation_labels = [all_activation_labels[i] for i in range(num_act)]
     
     num_intermediate = torch.as_tensor(num_intermediate, dtype=torch.long)
     dag = DAG(num_input, num_output, num_intermediate, connections, activations, check_valid=True)
