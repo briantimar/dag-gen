@@ -112,6 +112,9 @@ class BatchDAG:
         from .utils import get_activation
         self.activation_labels = activation_labels
         self.activation_functions = [get_activation(label) for label in activation_labels]
+    
+    def set_weight(self, weight):
+        self.weight = weight
 
     def _forward_with(self, x, activation_choices, weight=1.0):
         """ Compute forward passes for each of the networks on a single input.
@@ -262,12 +265,13 @@ class DAG(BatchDAG):
         y = super().forward(x, weight=weight)
         return y
 
-    def sample_action_with_log_prob(self, state, stochastic=True):
+    def sample_action_with_log_prob(self, state, stochastic=True, weight=None):
         """This is implemented for compatibility with my policy-gradient training code. 
             Given input state (singleton or 1d tensor) return action in [0, ... output_dim) defined by 
             sampling from the categorical distribution which uses DAG logits as final layer. 
-            stochastic: bool. If False, actions will be selected deterministically as the argmax of logits."""
-        logits = self.forward(state)
+            stochastic: bool. If False, actions will be selected deterministically as the argmax of logits.
+            `weight`: shared weight for forward pass; if not None this will override self.weight"""
+        logits = self.forward(state, weight=weight)
         if stochastic:
             dist = Categorical(logits=logits)
             action = dist.sample()
