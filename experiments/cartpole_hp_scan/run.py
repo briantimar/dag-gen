@@ -13,6 +13,7 @@ import json
 import os
 import logging
 
+
 def get_env(seed):
     env = gym.make(env_params.env_name)
     env.seed(seed)
@@ -62,6 +63,9 @@ def do_model_training(seed, min_intermediate, batch_size, lr, tr_id):
     
 
 if __name__ == "__main__":
+
+    ncore = int(sys.argv[1])
+   
     nlr = len(training_params.lrvals)
     nseed = training_params.numseed
     nbatchsize = len(training_params.batch_sizes)
@@ -70,7 +74,7 @@ if __name__ == "__main__":
     
     logging.basicConfig(level=logging.INFO)
     logging.info(f"found {ntot} parameter settings")
-    
+    logging.info(f"using {ncore} processes") 
 
     args = []
 
@@ -85,5 +89,5 @@ if __name__ == "__main__":
                                     training_params.lrvals[k],tr_id))
     
     logging.info("now training...")
-    with multiprocessing.Pool(2) as p:
+    with multiprocessing.Pool(ncore) as p:
         p.starmap(do_model_training, args)
