@@ -89,5 +89,7 @@ if __name__ == "__main__":
                                     training_params.lrvals[k],tr_id))
     
     logging.info("now training...")
-    with multiprocessing.Pool(ncore) as p:
-        p.starmap(do_model_training, args)
+    p = multiprocessing.Pool(ncore)
+    p.starmap(do_model_training, args)
+    p.close()
+    p.join()
